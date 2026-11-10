@@ -1,0 +1,41 @@
+# .gitignore per progetto Godot 4
+
+# Godot: cache e file generati automaticamente (si ricreano da soli)
+.godot/
+*.translation
+# Esportazioni del gioco (il .exe finale) e preset con dati locali
+export/
+export_credentials.cfg
+# NB: i file *.import NON vanno ignorati in Godot 4: servono al progetto
+
+# File di sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# Log e file temporanei
+*.log
+*.tmp
+tmp/
+temp/
+
+# Build e output generici
+build/
+dist/
+out/
+
+# Dipendenze (Node.js, se servirà)
+node_modules/
+
+# Variabili d'ambiente / segreti
+.env
+.env.*
+
+# Impostazioni locali di Claude Code (personali, non del progetto)
+.claude/settings.local.json
