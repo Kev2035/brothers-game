@@ -50,6 +50,9 @@ _In definizione._ Il nome "brothers-game" è provvisorio.
 
 **Godot 4** (ultima versione stabile 4.x, edizione standard con GDScript, non la versione .NET/C#). Scelto il 2026-11-10: i motivi sono in STATO.md.
 
+### Skill di game dev
+Sono installate a livello globale 20 skill della raccolta `awesome-gamedev-agent-skills` (l'elenco è in STATO.md). Per le richieste di game dev si parte dalla skill `router`, che carica solo le skill pertinenti. Prima di aggiungerne altre si chiede a Kevin.
+
 ## Architettura
 
 Tutto è costruito con **scene** di Godot che si incastrano tra loro. I blocchi principali:

@@ -2,13 +2,13 @@
 
 ## Situazione attuale
 
-Progetto appena impostato: repository git, `.gitignore` provvisorio, `CLAUDE.md` e questo file. Nessun codice e nessun engine. Idea di base definita (vedi CLAUDE.md). Engine scelto (Godot 4.7.2, installato). Progetto Godot vuoto creato con le cartelle. Prossima: **Fase 4** (skill).
+Progetto appena impostato: repository git, `.gitignore` provvisorio, `CLAUDE.md` e questo file. Nessun codice e nessun engine. Idea di base definita (vedi CLAUDE.md). Engine scelto (Godot 4.7.2, installato). Progetto Godot vuoto creato con le cartelle. 20 skill di game dev installate (Fase 4 chiusa). L'impianto è completo: si può iniziare a progettare e costruire il gioco.
 
 Piano generale:
 1. Fase 1 — Impianto del progetto ✅
 2. Fase 2 — Capire l'idea ✅
 3. Fase 3 — Scegliere engine e architettura ✅
-4. Fase 4 — Valutare e installare le skill di game dev (solo quelle utili) ⏳
+4. Fase 4 — Valutare e installare le skill di game dev (solo quelle utili) ✅
 
 ## Decisioni prese
 
@@ -34,12 +34,21 @@ Piano generale:
 |------|-----------|----------|------|------|
 | 2026-11-10 | Godot Engine (standard, GDScript) | 4.7.2 stable | `winget install --id GodotEngine.GodotEngine` | `%LOCALAPPDATA%\Microsoft\WinGet\Packages\GodotEngine.GodotEngine_...`. Il comando `godot` **non** funziona (winget lo crea solo con diritti di amministratore): si apre dai collegamenti "Godot 4.7" nel menu Start e sul desktop |
 | — | Node.js (già presente) | 24.19.0 | — | serve per la Fase 4 |
+| 2026-11-10 | 20 skill di game dev da `gamedev-skills/awesome-gamedev-agent-skills` (Apache-2.0) | versione della repo al 2026-11-10, CLI `skills` 1.7.6 | `npx skills add gamedev-skills/awesome-gamedev-agent-skills -g -a claude-code --copy -y --skill ...` | `C:\Users\PC\.claude\skills\` (globali, solo Claude Code, copie vere) |
+
+**Skill installate (20):** `router` · Godot: `godot-gdscript`, `godot-nodes-scenes`, `godot-signals-groups`, `godot-2d-movement`, `godot-physics`, `godot-tilemap`, `godot-animation`, `godot-resources`, `godot-ui-control`, `godot-audio`, `godot-export`, `godot-gdscript-headless-testing` · Discipline: `input-systems`, `game-feel`, `camera-systems`, `level-design`, `create-game-assets` · Genere e metodo: `platformer`, `prototype-fast`.
+
+**Rimandate (da aggiungere se serviranno):** `godot-shaders`, `shader-programming`, `physics-tuning`, `audio-design`, `game-ui-ux`, `game-ai`, `performance-optimization`, `steam-publish`.
+
+**Escluse di proposito:** `godot-multiplayer` (è solo per l'online, il gioco locale non ne ha bisogno), `godot-3d-essentials`, `godot-csharp`, le skill degli altri engine e dei generi che non c'entrano.
+
+Comandi utili: `npx skills list -g` (cosa è installato) · `npx skills check` (aggiornamenti) · `npx skills add gamedev-skills/awesome-gamedev-agent-skills -g -a claude-code --copy -y --skill <nome>` (aggiungerne una).
 
 ## Prossimi passi
 
-- Kevin apre il progetto in Godot con "Importa" per vederlo nel Project Manager.
-- Fase 4: valutare le skill di game dev per Godot.
 - Kevin mostrerà alcuni screenshot di riferimento.
+- Scrivere un primo documento di design essenziale in `docs/` (regole del round, prime 3-4 armi, prima arena).
+- Primo prototipo grezzo (con rettangoli al posto della grafica): 2 giocatori con joystick che corrono, saltano e sparano in un'arena semplice, per capire se il movimento è divertente.
 
 ## Dubbi aperti
 
@@ -57,3 +66,5 @@ Piano generale:
 - **2026-11-10** — Kevin ha scelto **Godot 4**. Architettura e cartelle annotate in CLAUDE.md. `.gitignore` adattato a Godot.
 - **2026-11-10** — Installato Godot 4.7.2 con winget (verificato con `--version`).
 - **2026-11-10** — Il comando `godot` non funzionava: creati i collegamenti "Godot 4.7" nel menu Start e sul desktop. Creati `project.godot` (impostazioni per la pixel art), `.gitattributes`, le cartelle `assets/`, `src/`, `docs/` (con `.gitkeep` vuoti, perché git non salva le cartelle vuote) e `assets/LICENZE.md`. Il progetto si apre in Godot senza errori.
+- **2026-11-10** — Primo commit (`9a7b842`). Fase 4: letti README, INSTALLATION e COMPATIBILITY della raccolta `gamedev-skills/awesome-gamedev-agent-skills` (licenza Apache-2.0, skill Godot allineate alla 4.7). Fatta l'anteprima con `--list` (CLI `skills` 1.7.6), senza installare niente. Controllati gli script inclusi: fanno solo analisi locale di file e immagini. Proposta a Kevin una selezione di 20 skill, in attesa del suo ok.
+- **2026-11-10** — Kevin ha approvato le 20 skill: installate a livello globale per Claude Code. Verifica superata: 20 su 20 presenti con `SKILL.md` valido e visibili a Claude Code. **Fase 4 chiusa.**
