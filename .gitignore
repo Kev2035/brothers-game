@@ -37,5 +37,11 @@ node_modules/
 .env
 .env.*
 
+# Screenshot di riferimento (copyright di altri giochi): solo in locale
+docs/riferimenti/*
+!docs/riferimenti/LEGGIMI.md
+!docs/riferimenti/NOTE.md
+!docs/riferimenti/.gdignore
+
 # Impostazioni locali di Claude Code (personali, non del progetto)
 .claude/settings.local.json

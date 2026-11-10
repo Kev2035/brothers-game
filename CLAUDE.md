@@ -26,12 +26,15 @@ _In definizione._ Il nome "brothers-game" è provvisorio.
 - **Genere**: picchiaduro / sparatutto in arena, a turni brevi: **due personaggi uno contro l'altro**, la partita (round) finisce quando uno dei due muore.
 - **Ispirazioni** (solo come riferimento, il gioco deve essere originale: niente personaggi, grafica, livelli o nomi copiati):
   - *Stick Fight: The Game*: duello in un'arena, armi che cadono dal cielo, ambientazioni che cambiano durante la partita.
-  - *Metal Slug*: stile grafico pixel art e controlli semplici.
+  - *Metal Slug*: controlli semplici. La pixel art è stata scartata il 2026-11-11.
 - **Controlli e azioni**: pochi e semplici (muoversi, saltare, mirare, sparare, colpire a mani nude). Il divertimento viene dalle armi e dall'ambientazione, non da combo complicate.
 - **Sensazione del movimento**: **arcade e preciso**, niente fisica "ragdoll" (personaggi molli). Quando vieni colpito subisci un contraccolpo e ti spingi un po' indietro, come in un picchiaduro tipo Street Fighter. Il movimento però deve essere **molto veloce e fluido**, come in Stick Fight: corsa rapida, salti molto alti (anche più alti con i potenziamenti), schivate, saltare alle spalle dell'avversario e sparargli. Battaglie rapide e ragionate, mai lente.
 - **Giocatori**: da 2 a 4 sullo stesso schermo. Si progetta **fin da subito per fino a 4** (input, punti di partenza, telecamera e dimensioni delle arene), anche se all'inizio si gioca in 2.
 - **Visuale**: **2D fisso**, visto di lato. *Idea per il futuro, da non fare ora*: arene che "si rompono" e passano a un falso 3D fatto con tecniche 2D (strada che scorre verso lo schermo, labirinto visto dall'alto inclinato).
-- **Grafica e audio**: Kevin non disegna. Si useranno **pacchetti gratuiti già pronti** ed eventualmente strumenti di IA per generare pixel art. Bisogna sempre controllare la licenza di ogni risorsa e annotarla.
+- **Stile grafico**: **pupazzetti disegnati** (non pixel art): corpo tondo, mani e piedi staccati, gusto anime/chibi. Tutti hanno la **stessa sagoma** e si distinguono per colore. Si animano **"a pezzi" (cutout)**: i pezzi si muovono e ruotano in Godot, senza disegni fotogramma per fotogramma. I pezzi da colorare si preparano chiari (bianchi o grigi), così Godot può tingerli di qualsiasi colore.
+- **Armi standardizzate**: ogni arma è un solo disegno, con il punto di impugnatura e il punto da cui esce il colpo. Si aggancia alla "mano" del personaggio, che ruota per mirare. Poche famiglie di armi (una mano, due mani, corpo a corpo, da lancio), con un'animazione condivisa per famiglia. Qualsiasi personaggio usa qualsiasi arma.
+- **Personaggi**: all'inizio tutti uguali, cambia solo il colore. Esiste comunque una "scheda personaggio" (`Resource`), pronta ad accogliere in futuro skin o statistiche.
+- **Grafica e audio**: Kevin non disegna. Si useranno pacchetti gratuiti già pronti e/o immagini generate con l'IA e scontornate da Kevin. Bisogna sempre controllare la licenza di ogni risorsa (anche i termini d'uso dello strumento di IA) e annotarla.
 - **Armi**: cadono dal cielo durante il round; tipi diversi con poteri diversi, da saper usare bene.
 - **Ambientazioni (arene)**: una sola schermata fissa per round, senza esplorazione. Piattaforme su cui salire ed elementi tipici di ogni ambientazione. Possono essere **dinamiche e distruttibili** (es. colonne di ghiaccio che si rompono a colpi d'arma e fanno precipitare l'avversario). **Cadere nel vuoto uccide** ed è uno dei modi principali per morire. Nel riferimento ce ne sono 50-70; il numero per noi è da definire.
 
@@ -59,7 +62,8 @@ Tutto è costruito con **scene** di Godot che si incastrano tra loro. I blocchi 
 
 - **Gestore partita** (`src/core/`): round, punteggi, fine round quando resta vivo un solo giocatore, cambio arena.
 - **Gestore controlli** (`src/core/`): associa ogni joystick a un giocatore. Va scritto per **N giocatori (fino a 4)**, mai con codice fisso per "giocatore 1 e 2".
-- **Personaggio** (`src/player/`): `CharacterBody2D` con movimento arcade fatto a mano, veloce e preciso. Niente ragdoll né `RigidBody2D` per i personaggi. Ha contraccolpo quando viene colpito.
+- **Personaggio** (`src/player/`): `CharacterBody2D` con movimento arcade fatto a mano, veloce e preciso. Niente ragdoll né `RigidBody2D` per i personaggi. Ha contraccolpo quando viene colpito. Grafica a pezzi (corpo, mani, piedi) animata in Godot, con un punto di aggancio "mano" che ruota verso la mira.
+- **Oggetti delle arene** (`src/objects/`): possono usare la fisica di Godot (`RigidBody2D`, giunti), per esempio casse in equilibrio, laser che oscillano, travi appese a catene.
 - **Armi** (`src/weapons/`): una scena "arma base" più una scheda dati (`Resource`) per ogni arma (danno, cadenza, rinculo, munizioni…). Un'arma nuova si crea compilando una nuova scheda.
 - **Generatore di armi**: fa cadere le armi dal cielo durante il round.
 - **Arena** (`src/arenas/<nome>/`): piattaforme, 4 punti di partenza, zona di morte (il vuoto), elementi distruttibili.

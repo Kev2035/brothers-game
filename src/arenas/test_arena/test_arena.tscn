@@ -1,0 +1,74 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/arenas/test_arena/test_arena.gd" id="1_arena"]
+[ext_resource type="Script" path="res://src/objects/platform.gd" id="2_platform"]
+
+[node name="TestArena" type="Node2D"]
+script = ExtResource("1_arena")
+
+[node name="Background" type="ColorRect" parent="."]
+offset_right = 1920.0
+offset_bottom = 1080.0
+mouse_filter = 2
+color = Color(0.09, 0.11, 0.18, 1)
+
+[node name="Platforms" type="Node2D" parent="."]
+
+[node name="GroundLeft" type="StaticBody2D" parent="Platforms"]
+position = Vector2(120, 880)
+script = ExtResource("2_platform")
+size = Vector2(620, 200)
+
+[node name="GroundRight" type="StaticBody2D" parent="Platforms"]
+position = Vector2(1180, 880)
+script = ExtResource("2_platform")
+size = Vector2(620, 200)
+
+[node name="MiddleBlock" type="StaticBody2D" parent="Platforms"]
+position = Vector2(780, 610)
+script = ExtResource("2_platform")
+size = Vector2(360, 50)
+
+[node name="LedgeLeft" type="StaticBody2D" parent="Platforms"]
+position = Vector2(250, 620)
+script = ExtResource("2_platform")
+size = Vector2(300, 24)
+one_way = true
+
+[node name="LedgeRight" type="StaticBody2D" parent="Platforms"]
+position = Vector2(1370, 620)
+script = ExtResource("2_platform")
+size = Vector2(300, 24)
+one_way = true
+
+[node name="HighLeft" type="StaticBody2D" parent="Platforms"]
+position = Vector2(520, 370)
+script = ExtResource("2_platform")
+size = Vector2(240, 24)
+one_way = true
+
+[node name="HighRight" type="StaticBody2D" parent="Platforms"]
+position = Vector2(1160, 370)
+script = ExtResource("2_platform")
+size = Vector2(240, 24)
+one_way = true
+
+[node name="Top" type="StaticBody2D" parent="Platforms"]
+position = Vector2(840, 180)
+script = ExtResource("2_platform")
+size = Vector2(240, 24)
+one_way = true
+
+[node name="Spawns" type="Node2D" parent="."]
+
+[node name="Spawn1" type="Marker2D" parent="Spawns"]
+position = Vector2(300, 878)
+
+[node name="Spawn2" type="Marker2D" parent="Spawns"]
+position = Vector2(1620, 878)
+
+[node name="Spawn3" type="Marker2D" parent="Spawns"]
+position = Vector2(400, 618)
+
+[node name="Spawn4" type="Marker2D" parent="Spawns"]
+position = Vector2(1520, 618)

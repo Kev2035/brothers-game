@@ -1,0 +1,22 @@
+# Note sugli screenshot
+
+Scrivi qui un commento per ogni immagine (facoltativo).
+
+| File | Commento |
+|stick-fight-arena-laser-01|In questa scena l'ambientazione contiene un laser che penzola, se il personaggio sale sulla piattaforma sopra il laser, questa comincia ad oscillare e il laser di conseguenza. Quando il laser colpisce un personaggio, è istantaneamente ucciso|
+|stick-fight-arena-laser-02|Qui è il momento successivo al laser che ha oscillato e ha preso un giocatore, il giocatore è a terra morto, mentre compare la scritta OWNAGE del colore del personaggio giallo perchè è il sopravissuto e quindi il vincente, si vedono anche delle scintille del laser e il laser non può rompere l'ambiente|
+|stick-fight-arena-laser-03|Qui si vede come il personaggio blu possa usare la piattaforma per farla oscillare sperando che colpisca il personaggio giallo mentre quest'ultimo continua a sparare|
+|stick-fight-arena-travi-01|In questo ambiente ci sono due travi, le catene sono spezzabili dalle armi, se le travi con gli spuntoni toccano un personaggio questo muore, la partita si gioca tra  lo sparare il personaggio avversario e il provare a rompere le catene o per far cadere addosso una trave o per far cadere tutti quanti, il primo che cade sotto muore. Evidentemente c'è un limite del gioco che non è esattamente alla fine dello schermo ma qualche centimetro sotto dove se un personaggio lo tocca muore|
+|stick-fight-arena-ghiaccio2-01|Arena di ghiaccio, dietro c'è la neve, e la piattaforma con la neve è più scivolosa il personaggio scivola leggermente, gli alberi sono elementi dove uno può andare dietro, ma non si protege semplicemente nasconde leggermente il suo personaggio dietro l'albero però è praticamewnte inutile mentre le rocce fungono da protezione non ci puoi andare dietro ma ti puoi nascondere mettendoti prima della roccia così non ti può colpire|
+|stick-fight-arena-ghiaccio3-01|Il ghiaccio si può rompere con gli spari. Qui i personaggi possono far crollare la piattaforma sparandogli e sperando che l'avversario cada e quindi perda|
+|stick-fight-arena-ghiaccio3-02|Qui si vede un persionaggio cadere, non è ancora morto come ti dicevo c'è forse un limite più grande dello schermo ma a breve muore perchè non ha nessun appiglio|
+|stick-fight-arena-ruota-01|Qui c'è una piattaforma che continua a girare. Si può usare per salire sopra mentre gira e combattere avendo questo elemento che gira|
+|stick-fight-arena-explode-01|Qui ci sono dei barili che se colpiti esplodono facendo partire un mini count-down, l'animazione è il barile che si ingrandisce e restringe leggermente 3 volte fino a che non esplode, se sei vicino fa danno ma se sei in prossimità non ti fa danno anche se il fuoco ti tocca ci deve essere un certo raggio che fa danno attorno al barile esploso. Solo se sei molto vicino subisci danno o addirittura muori|
+|stick-fight-arena-explode2-01|Ambiente simile a arena-explode ma qui ci sono dei barili da dove escono dei serpenti. I serpenti sono degli elementi di gioco che si muovono ed inseguono il personaggio più vicino sempre. La loro capacità di movimento è solo strisciare quindi se finiscono in una zona che li racchiude per esempio tra due rocce non possono sorpassarle e continuano a girare lì finchè un personaggio ci cade in mezzo e allora lo inseguono e lo mordono. Ci vogliono circa 10 morsi per uccidere un personaggio ma spesso ci sono tanti serpenti e quindi ci vuole poco a morire se hai 3 o 4 serpenti che ti continuano a mordere. I serpenti sono indistruttibili in questo gioco|
+|stick-fight-arena-boxes-01|Qui l'ambiente è costituito da una costruzione che è in equilibrio dai pesi. Sparando si possono spostare le scatole  e spostandole si sposta l'equilibrio la piattaforma comincia a traballare. Se viene sbilanciata del tutto la piattaforma può tranquillamente cadere e cadono tutti. Vince chi cade per ultimo o chi si ammazza prima|
+|stick-fight-arena-boxes-02|Scena dove si vede la piattaforma cadere|
+|stick-fight-arena-boxes-03|Scena di vittoria quando un personaggio muore compare anche una specie di fumo del suo stesso colore, quando un personaggio vince appare una scritta casuale tra un numero limitato di scritte del colore del personaggio vincente|
+|stick-fighe-arena-ghiacchio-01|Qui le armi cadono ci si spara e il ghiaccio si può rompere tranne il ghiaccio solido e spesso delle basi.|
+|stick_fight_arena_boxes4_4players|qui si vede la modalità in 4 personaggi|
+
+
