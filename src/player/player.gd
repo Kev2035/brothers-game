@@ -109,6 +109,12 @@ var last_attacker: Player = null ## chi ti ha colpito per ultimo (per sapere chi
 var _last_attacker_timer := 0.0
 ## Se non è null, il personaggio è comandato dal computer (manichino d'allenamento).
 var bot: DummyBrain = null
+## Arma in mano (null = mani nude: si tirano pugni).
+var weapon: WeaponData = null
+var ammo := 0
+var _fire_cd := 0.0
+var _fire_queued := 0.0
+var _muzzle_flash := 0.0
 
 
 func _ready() -> void:
@@ -243,12 +249,24 @@ func _physics_process(delta: float) -> void:
 	if shield_follows_aim and is_shielding():
 		_shield_dir = aim
 
-	# Pugno: si può "martellare" il tasto, i pugni partono appena possibile.
-	# O scudo o attacco: con lo scudo alzato non si colpisce.
-	if not stunned and not is_shielding() and _just("attack"):
-		_punch_queued = punch_buffer
-	if _punch_queued > 0.0 and _punch_cd <= 0.0 and not stunned and not is_shielding():
-		_punch()
+	# Lasciare l'arma.
+	if weapon != null and _just("drop"):
+		throw_down_weapon()
+
+	# Attacco. O scudo o attacco: con lo scudo alzato non si colpisce.
+	if weapon != null:
+		# Con un'arma: le automatiche sparano tenendo premuto, le altre a ogni pressione.
+		if not stunned and not is_shielding() and _just("attack"):
+			_fire_queued = punch_buffer
+		var wants := _held("attack") if weapon.automatic else _fire_queued > 0.0
+		if wants and _fire_cd <= 0.0 and not stunned and not is_shielding():
+			_shoot()
+	else:
+		# A mani nude: pugni. Si può "martellare" il tasto, partono appena possibile.
+		if not stunned and not is_shielding() and _just("attack"):
+			_punch_queued = punch_buffer
+		if _punch_queued > 0.0 and _punch_cd <= 0.0 and not stunned and not is_shielding():
+			_punch()
 
 	move_and_slide()
 	_read_floor()
@@ -311,6 +329,9 @@ func _tick_timers(delta: float) -> void:
 		if _shield_t > shield_duration:
 			_shield_t = -1.0
 	_shield_flash = maxf(_shield_flash - delta, 0.0)
+	_fire_cd -= delta
+	_fire_queued -= delta
+	_muzzle_flash = maxf(_muzzle_flash - delta, 0.0)
 	_flash = maxf(_flash - delta, 0.0)
 	_squash = move_toward(_squash, 0.0, delta * 6.0)
 	if _drop_timer > 0.0:
@@ -416,6 +437,69 @@ func _die(cause: String) -> void:
 	died.emit(self, cause)
 
 
+## Raccoglie un'arma. ammo = colpi rimasti (-1 = caricatore pieno).
+func equip(data: WeaponData, with_ammo := -1) -> void:
+	weapon = data
+	ammo = data.ammo if with_ammo < 0 else with_ammo
+	_fire_cd = 0.0
+	_fire_queued = 0.0
+	_punch_t = -1.0
+
+
+func drop_weapon() -> void:
+	weapon = null
+	ammo = 0
+
+
+## Lascia cadere l'arma in mano: cade dov'è e resta lì con i colpi rimasti,
+## così si può prendere un'arma migliore passandoci sopra.
+func throw_down_weapon() -> WeaponPickup:
+	if weapon == null:
+		return null
+	var pickup := WeaponPickup.new()
+	pickup.data = weapon
+	pickup.ammo = ammo
+	pickup.death_y = death_y
+	pickup.ignore_player = self
+	pickup.position = global_position + BODY
+	get_parent().add_child(pickup)
+	drop_weapon()
+	return pickup
+
+
+## Punto in cui si impugna l'arma (davanti al corpo, nella direzione di mira).
+func grip_position() -> Vector2:
+	return global_position + BODY + aim * 30.0
+
+
+## Spara un colpo dell'arma in mano: proiettili, rinculo su chi spara, munizioni.
+func _shoot() -> void:
+	_fire_cd = weapon.fire_interval
+	_fire_queued = 0.0
+	_muzzle_flash = 0.06
+	var muzzle := grip_position() + aim * weapon.length
+	for i in weapon.pellets:
+		var spread := deg_to_rad(randf_range(-weapon.spread_deg, weapon.spread_deg) / 2.0)
+		var b := Bullet.new()
+		b.velocity = aim.rotated(spread) * weapon.bullet_speed * randf_range(0.95, 1.05)
+		b.damage = weapon.damage
+		b.shooter = self
+		b.max_distance = weapon.bullet_range
+		b.color = weapon.bullet_color
+		b.global_position = muzzle
+		get_parent().add_child(b)
+	# Rinculo: spinge chi spara nella direzione opposta alla mira.
+	var push := weapon.recoil * (1.0 if is_on_floor() else weapon.recoil_air_mult)
+	# Sparando verso il basso mentre cadi, prima si ferma la caduta: così il
+	# "salto col rinculo" è sempre uguale, qualunque sia la velocità di caduta.
+	if aim.y > 0.5 and velocity.y > 0.0:
+		velocity.y = 0.0
+	velocity -= aim * push
+	ammo -= 1
+	if ammo <= 0:
+		drop_weapon() # caricatore finito: l'arma sparisce
+
+
 func respawn(at: Vector2) -> void:
 	global_position = at
 	velocity = Vector2.ZERO
@@ -424,6 +508,8 @@ func respawn(at: Vector2) -> void:
 	_punch_t = -1.0
 	_shield_t = -1.0
 	_wall_lock = 0.0
+	weapon = null
+	ammo = 0
 	health = max_health
 	last_attacker = null
 	_last_attacker_timer = 0.0
@@ -465,8 +551,9 @@ func _draw() -> void:
 	var bob := sin(_run_phase * 2.0) * 3.0 if running else 0.0
 	var body := BODY + Vector2(0, bob)
 
-	# Mano dietro
-	_ball(body + Vector2(-facing * 30.0, 12.0), 9.0, dark)
+	# Mano dietro (con un'arma a due mani sta sull'arma, la disegniamo dopo)
+	if weapon == null or weapon.family == WeaponData.Family.ONE_HAND:
+		_ball(body + Vector2(-facing * 30.0, 12.0), 9.0, dark)
 
 	# Piedi
 	for i in 2:
@@ -493,11 +580,23 @@ func _draw() -> void:
 	var marker := Color(1, 1, 1, 0.55)
 	draw_circle(body + aim * 66.0, 5.0, marker)
 
-	# Mano davanti: a riposo sta nella direzione di mira, col pugno si allunga.
-	var ext := _punch_extension()
-	var dir := _punch_dir if _punch_t >= 0.0 else aim
-	var hand := body + dir * (38.0 + 55.0 * ext)
-	_ball(hand, 9.0 + 2.0 * ext, col)
+	if weapon == null:
+		# Mano davanti: a riposo sta nella direzione di mira, col pugno si allunga.
+		var ext := _punch_extension()
+		var dir := _punch_dir if _punch_t >= 0.0 else aim
+		var hand := body + dir * (38.0 + 55.0 * ext)
+		_ball(hand, 9.0 + 2.0 * ext, col)
+	else:
+		# Arma in mano: si disegna dall'impugnatura verso la mira.
+		var grip := body + aim * 30.0
+		var squashed := shake + Vector2(grip.x * sx, grip.y * sy)
+		WeaponDraw.draw_weapon(self, squashed, aim, weapon)
+		draw_set_transform(shake, 0.0, Vector2(sx, sy))
+		if _muzzle_flash > 0.0:
+			draw_circle(grip + aim * (weapon.length + 10.0), 14.0, Color(1, 0.9, 0.5, 0.9))
+		_ball(grip, 9.0, col)
+		if weapon.family == WeaponData.Family.TWO_HAND:
+			_ball(grip + aim * weapon.length * 0.6, 9.0, col)
 
 	# Scudo: arco davanti al personaggio che si chiude col passare del tempo.
 	if is_shielding():

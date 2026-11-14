@@ -5,7 +5,7 @@ extends RefCounted
 ## Così il codice del personaggio legge solo "il mio salto", senza sapere
 ## se arriva dalla tastiera o da un joystick. Funziona per N giocatori.
 
-const ACTIONS: Array[String] = ["left", "right", "up", "down", "jump", "attack", "shield"]
+const ACTIONS: Array[String] = ["left", "right", "up", "down", "jump", "attack", "shield", "drop"]
 
 ## Tipi di dispositivo con cui un giocatore può entrare in partita.
 const KEYBOARD_A := "kb_a" # W A S D + Spazio, mira col mouse, pugno clic sinistro / F
@@ -36,6 +36,7 @@ static func setup_player(slot: int, kind: String, device: int) -> void:
 			_mouse(slot, "attack", MOUSE_BUTTON_LEFT)
 			_key(slot, "shield", KEY_E)
 			_mouse(slot, "shield", MOUSE_BUTTON_RIGHT)
+			_key(slot, "drop", KEY_Q)
 		KEYBOARD_B:
 			_key(slot, "left", KEY_LEFT)
 			_key(slot, "right", KEY_RIGHT)
@@ -46,6 +47,8 @@ static func setup_player(slot: int, kind: String, device: int) -> void:
 			_key(slot, "attack", KEY_KP_0)
 			_key(slot, "shield", KEY_SHIFT, KEY_LOCATION_RIGHT) # solo lo Shift destro
 			_key(slot, "shield", KEY_KP_1)
+			_key(slot, "drop", KEY_CTRL, KEY_LOCATION_RIGHT) # solo il Ctrl destro
+			_key(slot, "drop", KEY_KP_2)
 		JOYPAD:
 			_axis(slot, "left", device, JOY_AXIS_LEFT_X, -1.0)
 			_axis(slot, "right", device, JOY_AXIS_LEFT_X, 1.0)
@@ -60,6 +63,7 @@ static func setup_player(slot: int, kind: String, device: int) -> void:
 			_button(slot, "attack", device, JOY_BUTTON_RIGHT_SHOULDER)
 			_button(slot, "shield", device, JOY_BUTTON_LEFT_SHOULDER)
 			_button(slot, "shield", device, JOY_BUTTON_B)
+			_button(slot, "drop", device, JOY_BUTTON_Y)
 
 
 static func _key(slot: int, a: String, physical: Key, location := KEY_LOCATION_UNSPECIFIED) -> void:

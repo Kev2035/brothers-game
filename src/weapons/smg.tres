@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="WeaponData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/weapons/weapon_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+display_name = "Mitra"
+family = 1
+damage = 8.0
+pellets = 1
+spread_deg = 7.0
+automatic = true
+fire_interval = 0.075
+ammo = 40
+bullet_speed = 2500.0
+bullet_range = 2200.0
+recoil = 110.0
+recoil_air_mult = 1.4
+length = 80.0
+thickness = 16.0
+color = Color(0.42, 0.55, 0.42, 1)
+accent = Color(0.78, 0.95, 0.7, 1)
+bullet_color = Color(1, 0.95, 0.6, 1)

@@ -59,11 +59,11 @@ func _think_move(me: Player) -> void:
 		_timer = _rng.randf_range(0.8, 2.0)
 		if _rng.randf() < 0.4:
 			_walk_dir = -_walk_dir
-		if _rng.randf() < 0.5:
-			_press("jump")
+		if _rng.randf() < 0.5 and not _edge_ahead(me, _walk_dir, 320.0):
+			_press("jump") # salta solo se davanti c'è pavimento per un bel tratto
 		elif _rng.randf() < 0.3:
 			_press("shield")
-	if me.is_on_floor() and _edge_ahead(me, _walk_dir):
+	if me.is_on_floor() and _edge_ahead(me, _walk_dir, 70.0):
 		_walk_dir = -_walk_dir # non buttarti nel vuoto
 	move_x = _walk_dir
 	aim = Vector2(_walk_dir, 0.0)
@@ -78,6 +78,24 @@ func _think_attack(me: Player) -> void:
 	var d := (target.global_position + Player.BODY) - (me.global_position + Player.BODY)
 	aim = d.normalized()
 	var dir := signf(d.x)
+
+	# Con un'arma: resta a distanza e spara.
+	if me.weapon != null:
+		var keep := 250.0 if me.weapon.bullet_range < 1000.0 else 650.0
+		if absf(d.x) > keep and not (me.is_on_floor() and _edge_ahead(me, dir)):
+			move_x = dir
+		if d.y < -110.0 and _timer <= 0.0:
+			_press("jump")
+			_held["jump"] = true
+			_timer = 0.6
+		if d.length() < me.weapon.bullet_range * 0.9:
+			if me.weapon.automatic:
+				_held["attack"] = true
+			elif _attack_timer <= 0.0:
+				_press("attack")
+				_attack_timer = me.weapon.fire_interval + _rng.randf_range(0.15, 0.4)
+		return
+
 	if absf(d.x) > 80.0:
 		if not (me.is_on_floor() and _edge_ahead(me, dir) and d.y >= -40.0):
 			move_x = dir
@@ -115,7 +133,13 @@ func _nearest_enemy(me: Player) -> Player:
 	return best
 
 
-## C'è il vuoto davanti ai piedi?
-func _edge_ahead(me: Player, dir: float) -> bool:
-	var probe := me.global_transform.translated(Vector2(dir * 40.0, 0.0))
-	return not me.test_move(probe, Vector2(0.0, 60.0))
+## C'è il vuoto davanti ai piedi, entro "distance" pixel?
+func _edge_ahead(me: Player, dir: float, distance := 40.0) -> bool:
+	var step := 40.0
+	var x := step
+	while x <= distance:
+		var probe := me.global_transform.translated(Vector2(dir * x, 0.0))
+		if not me.test_move(probe, Vector2(0.0, 60.0)):
+			return true
+		x += step
+	return false

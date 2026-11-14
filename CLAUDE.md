@@ -80,7 +80,8 @@ brothers-game/
 ├── project.godot
 ├── assets/        sprites/, audio/, fonts/, LICENZE.md
 ├── src/           core/, player/, weapons/, arenas/, objects/, camera/, ui/
-└── docs/          documento di design
+├── tests/         test automatico (test_prototipo.gd, si lancia con Godot headless: vedi STATO.md)
+└── docs/          documento di design, riferimenti/ (screenshot, fuori da git)
 ```
 
 ## Convenzioni
@@ -88,4 +89,6 @@ brothers-game/
 - Scena e script di una stessa cosa stanno **nella stessa cartella**, divisi per argomento.
 - Ogni risorsa grafica o audio esterna va registrata in `assets/LICENZE.md` (origine, autore, licenza). Si preferiscono licenze CC0 o comunque compatibili con un'eventuale vendita.
 - Nomi di file e cartelle in minuscolo con trattini bassi (`snake_case`), come raccomanda Godot.
-- _Altre convenzioni da definire quando iniziamo a scrivere codice._
+- Ogni modifica al gioco si verifica con il test automatico `tests/test_prototipo.gd` (da aggiornare con le nuove funzioni) e, se cambia qualcosa di visibile, con uno screenshot reale. Poi Kevin prova.
+- I numeri da regolare stanno in variabili `@export` (modificabili dall'Inspector di Godot) con un commento in italiano che spiega cosa fanno.
+- Commenti nel codice in italiano, semplici.

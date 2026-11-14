@@ -13,6 +13,15 @@ const COLOR_NAMES: Array[String] = ["Rosso", "Blu", "Verde", "Giallo"]
 const DUMMY_COLOR := Color("9a9aa6")
 const RESPAWN_DELAY := 1.0
 const ROUND_END_DELAY := 2.5
+## Le armi disponibili (le "schede" in src/weapons/). Per aggiungerne una: nuovo .tres e una riga qui.
+const WEAPONS: Array[WeaponData] = [
+	preload("res://src/weapons/pistol.tres"),
+	preload("res://src/weapons/smg.tres"),
+	preload("res://src/weapons/shotgun.tres"),
+]
+const WEAPON_FIRST_DELAY := 2.0 ## secondi dall'inizio del round alla prima arma
+const WEAPON_INTERVAL := Vector2(4.0, 7.0) ## poi un'arma ogni 4-7 secondi
+const MAX_PICKUPS := 3 ## al massimo 3 armi a terra insieme
 ## Scritte di vittoria a caso: chi ha vinto si capisce dal colore della scritta.
 const WIN_PHRASES: Array[String] = [
 	"GG", "GG EZ", "EZ", "TOO EASY", "GET REKT", "REKT", "OWNED", "FLAWLESS",
@@ -33,6 +42,11 @@ var kills: Array[int] = [0, 0, 0, 0]
 var damage_dealt: Array[float] = [0.0, 0.0, 0.0, 0.0]
 var dummy: Player = null
 var round_over := false
+## false = le armi non cadono da sole (utile per le prove, e in futuro per la lobby).
+var auto_weapons := true
+var _spawn_timer := WEAPON_FIRST_DELAY
+var _give_index := 0
+var _hud_timer := 0.0
 var _round_id := 0 ## cambia a ogni round: i timer di un round vecchio non fanno danni
 
 var _joined := {} # "kb_a" / "kb_b" / "joy_0" ... -> slot
@@ -79,6 +93,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		elif k == KEY_F3:
 			remove_dummy()
+			return
+		elif k == KEY_F4:
+			give_weapon_to_all()
 			return
 	elif event is InputEventJoypadButton and event.pressed:
 		var b := event as InputEventJoypadButton
@@ -179,9 +196,50 @@ func start_round() -> void:
 	_round_id += 1
 	round_over = false
 	_banner.visible = false
+	# Via proiettili, armi a terra ed effetti del round precedente.
+	for node in get_tree().get_nodes_in_group("round_temp"):
+		node.queue_free()
+	_spawn_timer = WEAPON_FIRST_DELAY
 	var spawns := arena.spawn_points()
 	for p in participants():
 		p.respawn(spawns[p.slot])
+	_update_hud()
+
+
+func _physics_process(delta: float) -> void:
+	_hud_timer -= delta
+	if _hud_timer <= 0.0:
+		_hud_timer = 0.2
+		_update_hud() # tiene aggiornate le munizioni nella scritta
+	if round_over or participants().is_empty() or not auto_weapons:
+		return
+	_spawn_timer -= delta
+	if _spawn_timer <= 0.0:
+		_spawn_timer = randf_range(WEAPON_INTERVAL.x, WEAPON_INTERVAL.y)
+		if get_tree().get_nodes_in_group("pickups").size() < MAX_PICKUPS:
+			spawn_weapon()
+
+
+## Fa cadere un'arma dal cielo (a caso, se non si dice quale) in un punto a caso dell'arena.
+func spawn_weapon(data: WeaponData = null, x := NAN) -> WeaponPickup:
+	var b := arena.bounds
+	var pickup := WeaponPickup.new()
+	pickup.data = data if data != null else WEAPONS.pick_random()
+	pickup.death_y = arena.death_y
+	if is_nan(x):
+		x = randf_range(b.position.x + b.size.x * 0.12, b.end.x - b.size.x * 0.12)
+	pickup.position = Vector2(x, b.position.y - 120.0)
+	add_child(pickup)
+	return pickup
+
+
+## F4 (per le prove): dà a tutti la stessa arma, a turno pistola -> mitra -> pompa.
+func give_weapon_to_all() -> void:
+	var data := WEAPONS[_give_index]
+	_give_index = (_give_index + 1) % WEAPONS.size()
+	for p in participants():
+		if p.alive:
+			p.equip(data)
 	_update_hud()
 
 
@@ -235,28 +293,8 @@ func _on_player_died(p: Player, cause: String) -> void:
 
 ## Sbuffo di fumo del colore del personaggio quando muore.
 func _spawn_puff(pos: Vector2, color: Color) -> void:
-	var cp := CPUParticles2D.new()
-	cp.one_shot = true
-	cp.amount = 32
-	cp.lifetime = 0.8
-	cp.explosiveness = 0.9
-	cp.spread = 180.0
-	cp.initial_velocity_min = 120.0
-	cp.initial_velocity_max = 340.0
-	cp.gravity = Vector2(0, -80)
-	cp.damping_min = 120.0
-	cp.damping_max = 200.0
-	cp.scale_amount_min = 8.0
-	cp.scale_amount_max = 16.0
-	var ramp := Gradient.new()
-	ramp.set_color(0, color)
-	ramp.set_color(1, Color(color, 0.0))
-	cp.color_ramp = ramp
 	var b := arena.bounds
-	cp.position = Vector2(clampf(pos.x, b.position.x + 40.0, b.end.x - 40.0), minf(pos.y - 50.0, b.end.y - 60.0))
-	add_child(cp)
-	cp.emitting = true
-	cp.finished.connect(cp.queue_free)
+	Fx.puff(self, Vector2(clampf(pos.x, b.position.x + 40.0, b.end.x - 40.0), minf(pos.y - 50.0, b.end.y - 60.0)), color)
 
 
 func _short_name(p: Player) -> String:
@@ -278,14 +316,15 @@ func _describe(kind: String, device: int) -> String:
 
 func _update_hud() -> void:
 	var lines: Array[String] = []
-	lines.append("PROTOTIPO 2a - DANNI E ROUND      R / Start = nuovo round      F2 = manichino (premi ancora: cambia cosa fa)   F3 = togli manichino")
+	lines.append("PROTOTIPO 2b - ARMI     R / Start = nuovo round     F2 = manichino (premi ancora: cambia cosa fa)   F3 = togli manichino   F4 = arma a tutti")
 	if _free_slot() >= 0:
 		lines.append("Per entrare: W o Spazio (tastiera + mouse)  -  Freccia SU (tastiera frecce)  -  A sul joystick")
-	lines.append("Tastiera + mouse: A/D muovi, W/Spazio salta, S giu, mira col mouse, pugno clic sinistro (o F), scudo clic destro (o E)")
-	lines.append("Tastiera frecce: frecce muovi e mira, Freccia su salta, pugno Invio, scudo Shift destro  |  Joystick: levette muovi/mira, A salta, X/RB pugno, B/LB scudo")
+	lines.append("Tastiera + mouse: A/D muovi, W/Spazio salta, S giu, mira col mouse, pugno o SPARO clic sinistro (o F), scudo clic destro (o E), lascia arma Q")
+	lines.append("Tastiera frecce: frecce muovi e mira, Freccia su salta, pugno/sparo Invio, scudo Shift destro, lascia arma Ctrl destro  |  Joystick: levette muovi/mira, A salta, X/RB pugno/sparo, B/LB scudo, Y lascia arma")
 	for p in participants():
 		var label: String = names[p.slot]
 		if p == dummy:
 			label = "Manichino (%s)" % dummy.bot.mode_name()
-		lines.append("%s:  vittorie %d  ·  eliminazioni %d  ·  cadute %d  ·  danni fatti %d" % [label, wins[p.slot], kills[p.slot], falls[p.slot], int(damage_dealt[p.slot])])
+		var held := "mani nude" if p.weapon == null else "%s (%d colpi)" % [p.weapon.display_name, p.ammo]
+		lines.append("%s:  vittorie %d  ·  eliminazioni %d  ·  cadute %d  ·  danni fatti %d  ·  %s" % [label, wins[p.slot], kills[p.slot], falls[p.slot], int(damage_dealt[p.slot]), held])
 	hud.text = "\n".join(lines)

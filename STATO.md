@@ -2,7 +2,16 @@
 
 ## Situazione attuale
 
-Impianto completo (Godot 4.7.2, 20 skill, stile a pupazzetti con animazione a pezzi). **Tappa 1 approvata** (2026-11-13). **Tappa 2a in rifinitura** (vita nascosta, colpi senza spinta con lampo rosso, round con scritte di vittoria a caso, statistiche, manichino con F2, arena grande con telecamera): aspetta la prova di Kevin. Poi 2b (le 3 armi) e 2c (partita con lobby).
+Impianto completo (Godot 4.7.2, 20 skill, stile a pupazzetti con animazione a pezzi). **Tappa 1 approvata** (2026-11-13). **Tappa 2a approvata** (2026-11-14). **Tappa 2b approvata** (2026-11-14): 3 armi, sparo, rinculo, scudo sui proiettili, tasto per lasciare l'arma. **Prossima: tappa 2c** (lobby, partita infinita, cambio di arena a scorrimento).
+
+### Per riprendere in una nuova chat (aggiornato il 2026-11-14)
+- **Dove siamo**: tappa 2b chiusa e salvata (commit). Si riparte dalla **2c**.
+- **Cosa c'è nel gioco** (F5 in Godot): arena di prova 3200×1800 con telecamera; fino a 4 giocatori (tastiera+mouse entra con W o Spazio, tastiera frecce con Freccia su, joystick con A); corsa, salto, doppio salto, salto dai muri, piattaforme attraversabili (Giù+Salto); pugno con mira a 360°; scudo ad arco; vita nascosta (100), colpi che non spostano (lampo rosso); round con scritte di vittoria a caso; statistiche nella scritta in alto; armi (pistola, mitra, pompa) che cadono dal cielo; tasto per lasciare l'arma (Q / Ctrl destro / Y). Tasti di prova: **F2** manichino (premi ancora per cambiare cosa fa), **F3** lo toglie, **F4** dà un'arma a tutti, **R** nuovo round.
+- **Kevin ha una sola tastiera** (joystick in arrivo): per provare da solo si usa il manichino.
+- **Test automatico**: `tests/test_prototipo.gd` (58 controlli). Si lancia dalla cartella del progetto con:
+  `& "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\GodotEngine.GodotEngine_Microsoft.Winget.Source_8wekyb3d8bbwe\Godot_v4.7.2-stable_win64_console.exe" --headless --path . --script res://tests/test_prototipo.gd`
+  (prima, dopo aver aggiunto file nuovi, lanciare lo stesso comando con `--import` al posto di `--script ...`). Va aggiornato a ogni modifica.
+- **Modo di lavorare che funziona**: Claude costruisce → test automatico + screenshot reale → Kevin prova e dà feedback → ritocchi → ok di Kevin → commit + STATO.md.
 
 ### Workflow del progetto (concordato il 2026-11-11)
 Ogni tappa funziona così: Claude costruisce → Kevin prova → feedback e ritocchi → Kevin approva → commit e aggiornamento di STATO.md.
@@ -53,6 +62,11 @@ Piano generale:
 | 2026-11-14 | **I colpi non spostano chi li subisce** (né spinta né perdita di controllo). Chi è colpito diventa tutto rosso per un attimo e trema (solo grafica); il personaggio rosso diventa bianco. Il rinculo delle armi resterà per chi spara. Il rimbalzo del pugno in basso resta | Kevin: con la spinta il gioco si sbilanciava troppo sul far cadere l'avversario | attiva |
 | 2026-11-14 | **Scritte di vittoria a caso** in inglese "da gamer" (GG, EZ, GET REKT, OUTPLAYED…) nel colore del vincitore, al posto di "ROSSO VINCE" | Come in Stick Fight: chi vince si capisce dal colore | attiva |
 | 2026-11-14 | **Arena più ampia con telecamera**: l'arena di prova misura 3200×1800 e la telecamera la inquadra tutta (zoom 0,6), quindi i personaggi sono più piccoli sullo schermo, come nelle reference. Bordi invisibili come in Stick Fight: si può uscire dallo schermo di 250 px di lato e 450 px in alto, poi c'è un muro invisibile (da cui non si può saltare); sotto si muore | Kevin: arena troppo piccola e personaggi troppo grandi rispetto a Stick Fight | attiva |
+| 2026-11-14 | **Sistema delle armi**: ogni arma è una "scheda" (`WeaponData`, file `.tres` in `src/weapons/`) con danno, numero di pallini, dispersione, automatica sì/no, cadenza, munizioni, velocità e portata dei proiettili, rinculo, aspetto. Si impugna dalla "mano" che segue la mira; le armi a due mani hanno anche la seconda mano sull'arma | Requisito delle armi standardizzate: un'arma nuova = una scheda nuova, senza codice | attiva |
+| 2026-11-14 | **Regole delle armi (provvisorie)**: cadono dal cielo ogni 4-7 s (la prima dopo 2 s, max 3 a terra); si raccolgono passandoci sopra **solo a mani nude**; finite le munizioni l'arma sparisce e si torna ai pugni; a ogni round si riparte a mani nude. I proiettili si fermano sui muri solidi e attraversano le piattaforme attraversabili; lo scudo li para; non spostano chi colpiscono. Il rinculo spinge solo chi spara (più forte in aria; sparando in basso mentre cadi si fa un "salto col rinculo") | Prima versione da provare; da rivedere col bilanciamento | attiva |
+| 2026-11-14 | **Valori di partenza delle 3 armi** (vita = 100): pistola 20 di danno, 12 colpi, 5 colpi al secondo max · mitra 8 di danno, automatico ~13 colpi/s, 40 colpi, dispersione 7° · pompa 7 pallini da 9 (63 se vanno tutti a segno), portata 750 px, 6 colpi, rinculo fortissimo | Punto di partenza ragionevole; si rivede nel discorso sul bilanciamento | attiva |
+| 2026-11-14 | **Tasto per lasciare l'arma** (Q con tastiera+mouse, Ctrl destro con le frecce, Y sul joystick): l'arma cade dove sei e resta lì con i colpi rimasti; chi l'ha lasciata non la riprende finché non si allontana | Richiesta di Kevin: uso strategico, lasci l'arma per prenderne una più potente passandoci sopra | attiva |
+| 2026-11-14 | Test automatico salvato nel progetto in `tests/test_prototipo.gd` | Prima era solo nella cartella temporanea della chat: in una nuova chat sarebbe andato perso | attiva |
 | 2026-11-10 | Risoluzione interna 640×360, finestra 1280×720, ingrandimento solo a multipli interi, filtro "nearest", renderer Compatibility | 640×360 si ingrandisce perfettamente a 720p, 1080p e 4K. I pixel restano nitidi e quadrati. Compatibility è il renderer più leggero, adatto al 2D. Valori modificabili quando avremo la grafica | superata il 2026-11-11: abbandonata la pixel art |
 | 2026-11-11 | Risoluzione di riferimento 1920×1080, finestra 1280×720, ridimensionamento libero (`canvas_items`, scala frazionaria), filtro morbido (lineare), renderer Compatibility | Con la grafica disegnata serve alta risoluzione e immagini levigate, non pixel quadrati. Si disegna pensando al Full HD e il gioco si adatta a qualsiasi schermo | attiva |
 
@@ -74,15 +88,18 @@ Comandi utili: `npx skills list -g` (cosa è installato) · `npx skills check` (
 
 ## Prossimi passi
 
-- **Tappa 2 a piccoli passi**, ognuno da provare: **2a** vita, danni e manichino d'allenamento (per provare da solo) → **2b** le 3 armi che cadono dal cielo, sparo e proiettili parabili → **2c** round, lobby iniziale e statistiche.
-- **Discorso sui danni e sul bilanciamento**: alla fine della tappa 2, quando le 3 armi si potranno provare. Si scriverà una tabella delle armi in `docs/`.
-- Valutare se tenere il test automatico dentro il progetto (cartella `tests/`): oggi è solo nella cartella temporanea di Claude.
-- Decidere da dove prendere la grafica dei pupazzetti (IA + scontorno, pacchetti pronti, o un mix). Si farà alla tappa 5.
-- Decidere come scegliere i personaggi (proposta di Claude: all'inizio tutti uguali, cambia solo il colore, ma il sistema è pronto per aggiungere skin o statistiche in seguito).
-- Scrivere un primo documento di design essenziale in `docs/` (regole del round, prime 3-4 armi, prima arena).
-- Primo prototipo grezzo (con rettangoli al posto della grafica): 2 giocatori con joystick che corrono, saltano e sparano in un'arena semplice, per capire se il movimento è divertente.
+1. **Tappa 2c — Partita e lobby** (prossima):
+   - **Lobby**: una piattaforma semplice dove il gioco parte e ci si può già combattere; la partita inizia quando qualcuno fa fuori un avversario.
+   - **Partita infinita**: arene una dopo l'altra (per ora l'arena di prova + 2-3 varianti veloci); ogni ~20 arene si torna alla lobby, che mostra classifica e statistiche; si chiude quando si vuole e si vede il vincitore.
+   - **Cambio di arena a scorrimento** (idea di Kevin): arene una accanto all'altra nel mondo, la telecamera scorre fino alla prossima, caricamento in background.
+2. **Discorso sui danni e sul bilanciamento**, alla fine della tappa 2: concetto di "tempo per uccidere", tabella delle armi in `docs/`. Insieme: ritmo di caduta delle armi e munizioni (Kevin teme che cadano troppo spesso e che i caricatori finiscano troppo presto).
+3. **Tappa 3 — Documento di design**: Kevin descrive da zero partita e prima arena vera.
+4. Più avanti: grafica dei pupazzetti (tappa 5), scelta dei personaggi (proposta: tutti uguali, cambia il colore).
 
 ## Dubbi aperti
+
+- Armi: si devono poter anche **lanciare** addosso agli altri (come in Stick Fight)? Da decidere. (Lasciare l'arma: fatto.)
+- Armi: **ritmo di caduta** (ora una ogni 4-7 s) e **munizioni** forse troppo basse: Kevin ci pensa, se ne parla nel bilanciamento.
 
 - **Cambio di arena "a scorrimento"** (idea di Kevin, da fare nella tappa 2c): tutte le arene stanno una accanto all'altra in un grande mondo; finito il round la telecamera scorre fino all'arena successiva, mentre le prossime si caricano in background. Valutazione di Claude: è una buona idea e in Godot si può fare (caricamento in background con `ResourceLoader.load_threaded_request`, telecamera che scorre). L'arena grande con telecamera di questa tappa ne è già la base.
 
@@ -116,3 +133,5 @@ Comandi utili: `npx skills list -g` (cosa è installato) · `npx skills check` (
 - **2026-11-14** — Decisioni di Kevin per la tappa 2: barra della vita (pugni e proiettili tolgono vita), prime 3 armi pistola, mitra e fucile a pompa, partita "infinita" con lobby iniziale e ritorno alla lobby con le statistiche ogni ~20 arene. Concordato di dividere la tappa 2 in 2a/2b/2c.
 - **2026-11-14** — Costruita la **tappa 2a**: barra della vita sopra ogni pupazzetto (100 punti, un pugno ne toglie 10), morte a zero vita con sbuffo di fumo colorato, round (chi resta in piedi vince, scritta "COLORE VINCE!", nuovo round dopo 2,5 s con vita piena; da soli si ricompare subito), statistiche nella scritta in alto (vittorie, eliminazioni anche per caduta dopo un colpo, cadute, danni fatti), manichino d'allenamento (`src/player/dummy_brain.gd`). Il personaggio ora legge i comandi da tastiera/joystick oppure dal "cervello" del manichino. Test automatico: 38 controlli su 38.
 - **2026-11-14** — Feedback di Kevin sulla 2a: niente barra della vita, i colpi non devono spostare (lampo rosso al loro posto), scritte di vittoria "cool" a caso, arena troppo piccola. Fatto: barra tolta, spinta e perdita di controllo a 0, lampo rosso e tremolio, 24 scritte di vittoria, arena 3200×1800 con telecamera (zoom 0,6) e bordi invisibili (non validi per il salto dai muri). Trovato e corretto un difetto: il timer di un round già finito poteva far ripartire un round di troppo. Test automatico riscritto per l'arena grande: 36 controlli su 36. Kevin ha descritto il cambio di arena a scorrimento di Stick Fight (vedi Dubbi aperti).
+- **2026-11-14** — Kevin ha approvato la 2a (commit `7e27bd4`). Costruita la **tappa 2b**: scheda delle armi (`src/weapons/weapon_data.gd`) e 3 armi (`pistol.tres`, `smg.tres`, `shotgun.tres`), proiettili (`bullet.gd`) con controllo del tragitto, armi che cadono dal cielo e si raccolgono (`weapon_pickup.gd`), disegno provvisorio delle armi (`weapon_draw.gd`), effetti (`src/core/fx.gd`), sparo e rinculo nel personaggio, manichino che spara se ha un'arma, F4 per dare un'arma a tutti. Durante le prove: armi rese più chiare e più grandi (troppo scure sullo sfondo) e caduta azzerata prima del rinculo verso il basso (prima il "salto col rinculo" dipendeva dalla velocità di caduta). Test automatico: 53 controlli su 53.
+- **2026-11-14** — Kevin ha approvato la 2b (proiettili e piattaforme "ottimo"; ritmo delle armi e munizioni da ripensare). Aggiunto il tasto per lasciare l'arma (cade e tiene i colpi; chi la lascia non la riprende finché non si allontana). Aggiunto `auto_weapons` in `main.gd` per spegnere le armi automatiche. Manichino più prudente vicino al vuoto (ogni tanto si buttava nel pozzo saltando). Test automatico spostato nel progetto (`tests/test_prototipo.gd`): 58 controlli su 58, stabile su 3 esecuzioni. Kevin chiude la sessione; si riprende dalla tappa 2c in una nuova chat.
