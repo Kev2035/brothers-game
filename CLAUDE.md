@@ -25,12 +25,12 @@ _In definizione._ Il nome "brothers-game" è provvisorio.
 - **Per chi**: pensato per far giocare Kevin (30 anni) e suo fratello (16) quando sono a casa insieme.
 - **Genere**: picchiaduro / sparatutto in arena, a round brevi: **2-4 personaggi uno contro l'altro**, il round finisce quando ne resta vivo uno solo.
 - **Struttura della partita**: "infinita", come in Stick Fight. Si parte in una **lobby** (una piattaforma vuota) dove ci si può già combattere; la partita inizia quando qualcuno fa fuori un avversario. Poi le arene si susseguono round dopo round; ogni ~20 arene si torna alla lobby con classifica e statistiche. Si chiude quando si vuole, e si vede il vincitore.
-- **Vita**: barra della vita; pugni e proiettili tolgono vita (ogni arma il suo danno), a zero si muore. Cadere nel vuoto uccide sempre.
+- **Vita**: c'è (100 punti; pugni e proiettili tolgono vita, ogni arma il suo danno; a zero si muore), ma **non si mostra**: non si deve sapere qual è l'ultimo colpo. Cadere nel vuoto uccide sempre.
 - **Ispirazioni** (solo come riferimento, il gioco deve essere originale: niente personaggi, grafica, livelli o nomi copiati):
   - *Stick Fight: The Game*: duello in un'arena, armi che cadono dal cielo, ambientazioni che cambiano durante la partita.
   - *Metal Slug*: controlli semplici. La pixel art è stata scartata il 2026-11-11.
 - **Controlli e azioni**: pochi e semplici (muoversi, saltare, mirare, sparare, colpire a mani nude). Il divertimento viene dalle armi e dall'ambientazione, non da combo complicate.
-- **Sensazione del movimento**: **arcade e preciso**, niente fisica "ragdoll" (personaggi molli). Quando vieni colpito subisci un contraccolpo e ti spingi un po' indietro, come in un picchiaduro tipo Street Fighter. Il movimento però deve essere **molto veloce e fluido**, come in Stick Fight: corsa rapida, salti molto alti (anche più alti con i potenziamenti), schivate, saltare alle spalle dell'avversario e sparargli. Battaglie rapide e ragionate, mai lente.
+- **Sensazione del movimento**: **arcade e preciso**, niente fisica "ragdoll" (personaggi molli). **I colpi non spostano chi li subisce**: chi è colpito lampeggia di rosso e trema (solo grafica). Il rinculo delle armi riguarda solo chi spara. Il movimento però deve essere **molto veloce e fluido**, come in Stick Fight: corsa rapida, salti molto alti (anche più alti con i potenziamenti), schivate, saltare alle spalle dell'avversario e sparargli. Battaglie rapide e ragionate, mai lente.
 - **Giocatori**: da 2 a 4 sullo stesso schermo. Si progetta **fin da subito per fino a 4** (input, punti di partenza, telecamera e dimensioni delle arene), anche se all'inizio si gioca in 2.
 - **Visuale**: **2D fisso**, visto di lato. *Idea per il futuro, da non fare ora*: arene che "si rompono" e passano a un falso 3D fatto con tecniche 2D (strada che scorre verso lo schermo, labirinto visto dall'alto inclinato).
 - **Stile grafico**: **pupazzetti disegnati** (non pixel art): corpo tondo, mani e piedi staccati, gusto anime/chibi. Tutti hanno la **stessa sagoma** e si distinguono per colore. Si animano **"a pezzi" (cutout)**: i pezzi si muovono e ruotano in Godot, senza disegni fotogramma per fotogramma. I pezzi da colorare si preparano chiari (bianchi o grigi), così Godot può tingerli di qualsiasi colore.
@@ -64,12 +64,12 @@ Tutto è costruito con **scene** di Godot che si incastrano tra loro. I blocchi 
 
 - **Gestore partita** (`src/core/`): round, punteggi, fine round quando resta vivo un solo giocatore, cambio arena.
 - **Gestore controlli** (`src/core/`): associa ogni joystick a un giocatore. Va scritto per **N giocatori (fino a 4)**, mai con codice fisso per "giocatore 1 e 2".
-- **Personaggio** (`src/player/`): `CharacterBody2D` con movimento arcade fatto a mano, veloce e preciso. Niente ragdoll né `RigidBody2D` per i personaggi. Ha contraccolpo quando viene colpito. Grafica a pezzi (corpo, mani, piedi) animata in Godot, con un punto di aggancio "mano" che ruota verso la mira.
+- **Personaggio** (`src/player/`): `CharacterBody2D` con movimento arcade fatto a mano, veloce e preciso. Niente ragdoll né `RigidBody2D` per i personaggi. I colpi non lo spostano (solo lampo rosso). Grafica a pezzi (corpo, mani, piedi) animata in Godot, con un punto di aggancio "mano" che ruota verso la mira.
 - **Oggetti delle arene** (`src/objects/`): possono usare la fisica di Godot (`RigidBody2D`, giunti), per esempio casse in equilibrio, laser che oscillano, travi appese a catene.
 - **Armi** (`src/weapons/`): una scena "arma base" più una scheda dati (`Resource`) per ogni arma (danno, cadenza, rinculo, munizioni…). Un'arma nuova si crea compilando una nuova scheda.
 - **Generatore di armi**: fa cadere le armi dal cielo durante il round.
 - **Arena** (`src/arenas/<nome>/`): piattaforme, 4 punti di partenza, zona di morte (il vuoto), elementi distruttibili.
-- **Telecamera dinamica** (`src/camera/`): si allarga e si stringe per inquadrare tutti i giocatori.
+- **Telecamera**: per ora fissa, inquadra tutta l'arena (che è più grande dello schermo, es. 3200×1800 con zoom 0,6). Ogni arena ha i suoi `bounds` e bordi invisibili. In futuro scorrerà da un'arena all'altra (idea "arene una accanto all'altra", tappa 2c).
 - **Interfaccia** (`src/ui/`): menu, schermata di ingresso dei joystick, punteggi.
 
 ### Struttura delle cartelle

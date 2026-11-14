@@ -6,7 +6,12 @@ extends CharacterBody2D
 ## Tutti i numeri con @export si possono cambiare dall'Inspector di Godot
 ## mentre si prova, senza toccare il codice.
 
-signal died(player: Player)
+signal died(player: Player, cause: String) ## cause: "fall" (caduto) o "hp" (vita finita)
+signal damaged(victim: Player, attacker: Player, amount: float)
+
+@export_group("Vita")
+@export var max_health := 100.0
+@export var punch_damage := 10.0 ## vita tolta da un pugno (10 = servono 10 pugni)
 
 @export_group("Corsa")
 @export var run_speed := 700.0 ## velocità massima (pixel al secondo)
@@ -40,7 +45,7 @@ signal died(player: Player)
 @export var shield_max_half_angle := 90.0 ## apertura iniziale: 90 = semicerchio
 @export var shield_radius := 64.0
 @export var shield_follows_aim := false ## true = lo scudo ruota mentre muovi la mira
-@export var block_pushback := 250.0 ## piccola spinta quando pari un colpo
+@export var block_pushback := 0.0 ## spinta quando pari un colpo (0 = nessuna)
 
 @export_group("Mira")
 @export var aim_deadzone := 0.35 ## levetta destra: sotto questo valore non mira
@@ -52,9 +57,10 @@ signal died(player: Player)
 @export var punch_buffer := 0.1 ## un pugno premuto troppo presto parte appena possibile
 @export var punch_range := 115.0
 @export var punch_cone_deg := 45.0 ## quanto può essere "storta" la mira e colpire lo stesso
-@export var knockback_power := 1000.0 ## spinta subita nella direzione del pugno
-@export var knockback_lift := 350.0 ## spinta extra verso l'alto (fa "volare" un po')
-@export var hitstun := 0.28 ## secondi in cui chi è colpito non controlla il personaggio
+@export var knockback_power := 0.0 ## spinta subita da chi è colpito (0 = i colpi non spostano)
+@export var knockback_lift := 0.0 ## spinta extra verso l'alto per chi è colpito
+@export var hitstun := 0.0 ## secondi senza controllo per chi è colpito (0 = nessuno)
+@export var hit_flash_time := 0.15 ## quanto dura il lampo rosso quando vieni colpito
 @export var pogo_bounce := 1000.0 ## colpo verso il basso in aria: rimbalzi sopra l'avversario
 @export var pogo_refreshes_double_jump := true
 
@@ -98,6 +104,11 @@ var _wall_lock := 0.0
 var _shield_t := -1.0 ## tempo da quando hai alzato lo scudo (-1 = niente scudo)
 var _shield_dir := Vector2.RIGHT
 var _shield_flash := 0.0
+var health := 100.0
+var last_attacker: Player = null ## chi ti ha colpito per ultimo (per sapere chi ti ha fatto cadere)
+var _last_attacker_timer := 0.0
+## Se non è null, il personaggio è comandato dal computer (manichino d'allenamento).
+var bot: DummyBrain = null
 
 
 func _ready() -> void:
@@ -117,19 +128,40 @@ func act(a: String) -> StringName:
 	return InputSetup.action(slot, a)
 
 
+# Lettura dei comandi: da tastiera/joystick, oppure dal "cervello" del manichino.
+func _axis() -> float:
+	return bot.move_x if bot else Input.get_axis(act("left"), act("right"))
+
+
+func _vector() -> Vector2:
+	if bot:
+		return Vector2(bot.move_x, 0.0)
+	return Input.get_vector(act("left"), act("right"), act("up"), act("down"))
+
+
+func _held(a: String) -> bool:
+	return bot.is_held(a) if bot else Input.is_action_pressed(act(a))
+
+
+func _just(a: String) -> bool:
+	return bot.is_just(a) if bot else Input.is_action_just_pressed(act(a))
+
+
 func _physics_process(delta: float) -> void:
 	_recompute_jump() # così i cambi fatti dall'Inspector valgono subito
 	_tick_timers(delta)
+	if bot:
+		bot.think(self, delta)
 
 	var stunned := _hitstun_timer > 0.0
-	var input_x := 0.0 if stunned else Input.get_axis(act("left"), act("right"))
-	var down_held := not stunned and Input.is_action_pressed(act("down"))
+	var input_x := 0.0 if stunned else _axis()
+	var down_held := not stunned and _held("down")
 	var on_floor := is_on_floor()
 
 	if on_floor:
 		_coyote = coyote_time
 		_air_jumps = max_air_jumps
-	if not stunned and Input.is_action_just_pressed(act("jump")):
+	if not stunned and _just("jump"):
 		_buffer = jump_buffer
 
 	# Scendere da una piattaforma attraversabile: Giù + Salto.
@@ -141,7 +173,7 @@ func _physics_process(delta: float) -> void:
 
 	# Salto, in ordine di priorità: da terra (con coyote time e buffer),
 	# poi dal muro, poi doppio salto in aria.
-	var jump_now := not stunned and Input.is_action_just_pressed(act("jump"))
+	var jump_now := not stunned and _just("jump")
 	var wall_side := 0 if on_floor else _wall_side()
 	if _buffer > 0.0 and _coyote > 0.0:
 		velocity.y = -_jump_velocity
@@ -150,7 +182,7 @@ func _physics_process(delta: float) -> void:
 		_jump_held_cut = true
 		_squash = -0.6
 	elif jump_now and _coyote <= 0.0 and wall_side != 0:
-		var climbing := Input.is_action_pressed(act("up"))
+		var climbing := _held("up")
 		var h := wall_climb_height if climbing else wall_jump_height
 		velocity.y = -sqrt(2.0 * _gravity * h)
 		velocity.x = -float(wall_side) * (wall_climb_push if climbing else wall_jump_push)
@@ -167,7 +199,7 @@ func _physics_process(delta: float) -> void:
 		_squash = -0.5
 
 	# Salto variabile: se lasci il tasto mentre sali, il salto si accorcia.
-	if _jump_held_cut and velocity.y < 0.0 and not Input.is_action_pressed(act("jump")):
+	if _jump_held_cut and velocity.y < 0.0 and not _held("jump"):
 		velocity.y *= jump_cut
 		_jump_held_cut = false
 	if velocity.y >= 0.0:
@@ -204,7 +236,7 @@ func _physics_process(delta: float) -> void:
 		aim = Vector2(facing, 0.0)
 
 	# Scudo: ogni pressione lo rigenera, nella direzione in cui stai mirando.
-	if not stunned and Input.is_action_just_pressed(act("shield")):
+	if not stunned and _just("shield"):
 		_shield_t = 0.0
 		_shield_dir = aim
 		_punch_queued = 0.0
@@ -213,7 +245,7 @@ func _physics_process(delta: float) -> void:
 
 	# Pugno: si può "martellare" il tasto, i pugni partono appena possibile.
 	# O scudo o attacco: con lo scudo alzato non si colpisce.
-	if not stunned and not is_shielding() and Input.is_action_just_pressed(act("attack")):
+	if not stunned and not is_shielding() and _just("attack"):
 		_punch_queued = punch_buffer
 	if _punch_queued > 0.0 and _punch_cd <= 0.0 and not stunned and not is_shielding():
 		_punch()
@@ -229,7 +261,7 @@ func _physics_process(delta: float) -> void:
 	queue_redraw()
 
 	if global_position.y > death_y or global_position.x < side_limits.x or global_position.x > side_limits.y:
-		_die()
+		_die("fall")
 
 
 ## Calcola la direzione di mira a seconda del dispositivo.
@@ -237,6 +269,9 @@ func _update_aim() -> void:
 	var dir := Vector2.ZERO
 	_free_aim = false
 	match aim_mode:
+		"bot":
+			dir = bot.aim if bot else Vector2.ZERO
+			_free_aim = true
 		"mouse":
 			dir = get_global_mouse_position() - (global_position + BODY)
 			_free_aim = dir.length() > 1.0
@@ -246,11 +281,11 @@ func _update_aim() -> void:
 				dir = right_stick
 				_free_aim = true
 			else:
-				var left_stick := Input.get_vector(act("left"), act("right"), act("up"), act("down"))
+				var left_stick := _vector()
 				if left_stick.length() > 0.5:
 					dir = left_stick
 		_:
-			dir = Input.get_vector(act("left"), act("right"), act("up"), act("down"))
+			dir = _vector()
 	if dir.length() > 0.1:
 		aim = dir.normalized()
 	else:
@@ -268,6 +303,9 @@ func _tick_timers(delta: float) -> void:
 		if _punch_t > punch_out_time + punch_back_time:
 			_punch_t = -1.0
 	_wall_lock -= delta
+	_last_attacker_timer -= delta
+	if _last_attacker_timer <= 0.0:
+		last_attacker = null
 	if _shield_t >= 0.0:
 		_shield_t += delta
 		if _shield_t > shield_duration:
@@ -283,10 +321,10 @@ func _tick_timers(delta: float) -> void:
 
 ## C'è un muro attaccato a me? -1 = a sinistra, 1 = a destra, 0 = nessuno.
 func _wall_side() -> int:
-	if test_move(global_transform, Vector2(-wall_detect, 0.0)):
-		return -1
-	if test_move(global_transform, Vector2(wall_detect, 0.0)):
-		return 1
+	for side in [-1, 1]:
+		var c := move_and_collide(Vector2(side * wall_detect, 0.0), true)
+		if c and not (c.get_collider() as Node).is_in_group("bounds"):
+			return side # i bordi invisibili dell'arena non contano come muri
 	return 0
 
 
@@ -326,7 +364,7 @@ func _punch() -> void:
 		var in_reach := d.length() < punch_range + BODY_RADIUS
 		var in_cone := absf(rad_to_deg(aim.angle_to(d))) < punch_cone_deg
 		if in_reach and (in_cone or d.length() < BODY_RADIUS * 1.5):
-			if p.take_hit(aim, center):
+			if p.take_hit(aim, center, punch_damage, self):
 				hit_someone = true
 	# Pugno verso il basso in aria che colpisce: rimbalzi sopra l'avversario.
 	if hit_someone and aim.y > 0.6 and not is_on_floor():
@@ -339,30 +377,43 @@ func _punch() -> void:
 ## Se lo scudo copre quella direzione il colpo è parato (ritorna false),
 ## altrimenti spinta nella direzione del colpo e un attimo senza controllo (ritorna true).
 ## Servirà uguale per i proiettili: from_pos sarà il punto da cui arriva la pallottola.
-func take_hit(direction: Vector2, from_pos: Vector2) -> bool:
+func take_hit(direction: Vector2, from_pos: Vector2, damage := 0.0, attacker: Player = null) -> bool:
+	if not alive:
+		return false
 	if is_shielding():
 		var incoming := from_pos - (global_position + BODY)
 		if absf(rad_to_deg(_shield_dir.angle_to(incoming))) <= shield_half_angle():
 			_shield_flash = 0.12
 			velocity += direction * block_pushback
 			return false
-	velocity = direction * knockback_power + Vector2(0.0, -knockback_lift)
+	if knockback_power > 0.0 or knockback_lift > 0.0:
+		velocity = direction * knockback_power + Vector2(0.0, -knockback_lift)
 	_hitstun_timer = hitstun
-	_flash = 0.12
+	_flash = hit_flash_time
 	_jump_held_cut = false
 	_shield_t = -1.0 # se ti colpiscono, lo scudo cade
+	if attacker:
+		last_attacker = attacker
+		_last_attacker_timer = 4.0
+	if damage > 0.0:
+		var real_damage := minf(damage, health) # oltre la vita rimasta non conta
+		health -= real_damage
+		damaged.emit(self, attacker, real_damage)
+		if health <= 0.0:
+			_die("hp")
+			return true
 	if absf(direction.x) > 0.1:
 		facing = -signf(direction.x)
 	return true
 
 
-func _die() -> void:
+func _die(cause: String) -> void:
 	if not alive:
 		return
 	alive = false
 	visible = false
 	set_physics_process(false)
-	died.emit(self)
+	died.emit(self, cause)
 
 
 func respawn(at: Vector2) -> void:
@@ -373,6 +424,9 @@ func respawn(at: Vector2) -> void:
 	_punch_t = -1.0
 	_shield_t = -1.0
 	_wall_lock = 0.0
+	health = max_health
+	last_attacker = null
+	_last_attacker_timer = 0.0
 	set_collision_mask_value(LAYER_ONE_WAY, true)
 	alive = true
 	visible = true
@@ -396,9 +450,15 @@ func _punch_extension() -> float:
 func _draw() -> void:
 	var sy := 1.0 - _squash * 0.22
 	var sx := 1.0 + _squash * 0.18
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2(sx, sy))
+	# Colpito: il pupazzetto trema (solo il disegno, non si sposta davvero).
+	var shake := Vector2.ZERO
+	if _flash > 0.0:
+		shake = Vector2(randf_range(-4.0, 4.0), randf_range(-3.0, 3.0))
+	draw_set_transform(shake, 0.0, Vector2(sx, sy))
 
-	var col := Color.WHITE if _flash > 0.0 else color
+	# Colpito: diventa tutto rosso (il personaggio rosso diventa bianco, sennò non si vedrebbe).
+	var hit_color := Color.WHITE if color.r > 0.8 and color.g < 0.45 else Color(1.0, 0.12, 0.12)
+	var col := hit_color if _flash > 0.0 else color
 	var dark := col.darkened(0.3)
 	var grounded := is_on_floor()
 	var running := grounded and absf(velocity.x) > 40.0
@@ -447,6 +507,7 @@ func _draw() -> void:
 		draw_arc(body, shield_radius, a - half, a + half, 32, sc, 8.0, true)
 
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	# La vita non si mostra di proposito: non si sa mai qual è l'ultimo colpo.
 
 
 func _ball(center: Vector2, radius: float, fill: Color) -> void:

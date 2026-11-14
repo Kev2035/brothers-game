@@ -1,25 +1,61 @@
 extends Node2D
-## Scena principale del prototipo di movimento.
-## - Un giocatore entra premendo il suo tasto di salto (fino a 4 giocatori).
-## - Se cadi nel vuoto ricompari dopo un attimo e ti si conta una caduta.
-## - R (tastiera) o Start (joystick) rimette tutti al punto di partenza.
+## Scena principale del prototipo (tappa 2a: vita, danni e round).
+## - Un giocatore entra premendo il suo tasto di salto (fino a 4 posti).
+## - F2 aggiunge il manichino d'allenamento / cambia cosa fa; F3 lo toglie.
+## - Con almeno 2 partecipanti si gioca a round: chi resta vivo vince il round,
+##   poi tutti ricompaiono con la vita piena. Da soli si ricompare subito.
+## - R (tastiera) o Start (joystick) fa ripartire il round.
 
 const PLAYER_SCENE := preload("res://src/player/player.tscn")
 const MAX_PLAYERS := 4
 const COLORS: Array[Color] = [Color("e8524a"), Color("4a90e8"), Color("5cc46a"), Color("f2c84b")]
 const COLOR_NAMES: Array[String] = ["Rosso", "Blu", "Verde", "Giallo"]
+const DUMMY_COLOR := Color("9a9aa6")
 const RESPAWN_DELAY := 1.0
+const ROUND_END_DELAY := 2.5
+## Scritte di vittoria a caso: chi ha vinto si capisce dal colore della scritta.
+const WIN_PHRASES: Array[String] = [
+	"GG", "GG EZ", "EZ", "TOO EASY", "GET REKT", "REKT", "OWNED", "FLAWLESS",
+	"CLUTCH!", "SKILL DIFF", "GIT GUD", "NO CHANCE", "SHEESH", "BIG BRAIN",
+	"DOMINATED", "SIT DOWN", "OUTPLAYED", "NICE TRY", "BOOM!", "UNSTOPPABLE",
+	"TOO GOOD", "LET'S GOOO", "BUILT DIFFERENT", "CALCULATED",
+]
 
 @onready var arena: Arena = $TestArena
 @onready var hud: Label = $HUD/Label
 
-var players: Array[Player] = []
-var falls: Array[int] = []
-var device_names: Array[String] = []
-var _joined := {} # "kb_a" / "kb_b" / "joy_0" ... -> indice giocatore
+## Un posto per giocatore (null = posto libero). L'indice è lo "slot".
+var players: Array = [null, null, null, null]
+var names: Array[String] = ["", "", "", ""]
+var wins: Array[int] = [0, 0, 0, 0]
+var falls: Array[int] = [0, 0, 0, 0]
+var kills: Array[int] = [0, 0, 0, 0]
+var damage_dealt: Array[float] = [0.0, 0.0, 0.0, 0.0]
+var dummy: Player = null
+var round_over := false
+var _round_id := 0 ## cambia a ogni round: i timer di un round vecchio non fanno danni
+
+var _joined := {} # "kb_a" / "kb_b" / "joy_0" ... -> slot
+var _banner: Label
+var camera: Camera2D
 
 
 func _ready() -> void:
+	# Telecamera: inquadra tutta l'area dell'arena (più grande dello schermo),
+	# così i personaggi appaiono più piccoli e l'arena più ampia.
+	camera = Camera2D.new()
+	add_child(camera)
+	camera.make_current()
+	frame_arena(arena)
+	_banner = Label.new()
+	_banner.position = Vector2(0, 400)
+	_banner.size = Vector2(1920, 160)
+	_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_banner.add_theme_font_size_override("font_size", 110)
+	_banner.add_theme_constant_override("outline_size", 18)
+	_banner.add_theme_color_override("font_outline_color", Color("1b1b2b"))
+	_banner.visible = false
+	$HUD.add_child(_banner)
 	_update_hud()
 
 
@@ -36,7 +72,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			key = InputSetup.KEYBOARD_B
 			kind = InputSetup.KEYBOARD_B
 		elif k == KEY_R:
-			reset_positions()
+			start_round()
+			return
+		elif k == KEY_F2:
+			toggle_dummy()
+			return
+		elif k == KEY_F3:
+			remove_dummy()
 			return
 	elif event is InputEventJoypadButton and event.pressed:
 		var b := event as InputEventJoypadButton
@@ -45,46 +87,180 @@ func _unhandled_input(event: InputEvent) -> void:
 			kind = InputSetup.JOYPAD
 			device = b.device
 		elif b.button_index == JOY_BUTTON_START:
-			reset_positions()
+			start_round()
 			return
 
-	if key != "" and not _joined.has(key) and players.size() < MAX_PLAYERS:
+	if key != "" and not _joined.has(key):
 		add_player(kind, device, key)
 
 
-func add_player(kind: String, device: int, key: String) -> Player:
-	var slot := players.size()
-	InputSetup.setup_player(slot, kind, device)
+func frame_arena(a: Arena) -> void:
+	var view := Vector2(get_viewport().get_visible_rect().size)
+	if view.x <= 0.0:
+		view = Vector2(1920, 1080)
+	camera.position = a.bounds.get_center()
+	camera.zoom = Vector2.ONE * minf(view.x / a.bounds.size.x, view.y / a.bounds.size.y)
+
+
+func _free_slot() -> int:
+	for i in MAX_PLAYERS:
+		if players[i] == null:
+			return i
+	return -1
+
+
+func participants() -> Array[Player]:
+	var list: Array[Player] = []
+	for p in players:
+		if p != null:
+			list.append(p)
+	return list
+
+
+func _spawn(slot: int, color: Color) -> Player:
 	var p: Player = PLAYER_SCENE.instantiate()
 	p.slot = slot
-	p.color = COLORS[slot]
-	p.aim_mode = InputSetup.aim_mode_for(kind)
-	p.device = device
+	p.color = color
 	p.death_y = arena.death_y
 	p.side_limits = arena.side_limits
 	add_child(p)
 	p.respawn(arena.spawn_points()[slot])
 	p.died.connect(_on_player_died)
-	players.append(p)
-	falls.append(0)
-	device_names.append(_describe(kind, device))
+	p.damaged.connect(_on_player_damaged)
+	players[slot] = p
+	wins[slot] = 0
+	falls[slot] = 0
+	kills[slot] = 0
+	damage_dealt[slot] = 0.0
+	return p
+
+
+func add_player(kind: String, device: int, key: String) -> Player:
+	var slot := _free_slot()
+	if slot < 0:
+		return null
+	InputSetup.setup_player(slot, kind, device)
+	var p := _spawn(slot, COLORS[slot])
+	p.aim_mode = InputSetup.aim_mode_for(kind)
+	p.device = device
+	names[slot] = "%s (%s)" % [COLOR_NAMES[slot], _describe(kind, device)]
 	_joined[key] = slot
 	_update_hud()
 	return p
 
 
-func reset_positions() -> void:
-	var spawns := arena.spawn_points()
-	for p in players:
-		p.respawn(spawns[p.slot])
-
-
-func _on_player_died(p: Player) -> void:
-	falls[p.slot] += 1
+## F2: se non c'è, aggiunge il manichino fermo; se c'è, gli cambia comportamento.
+func toggle_dummy() -> void:
+	if dummy != null:
+		dummy.bot.next_mode()
+		_update_hud()
+		return
+	var slot := _free_slot()
+	if slot < 0:
+		return
+	dummy = _spawn(slot, DUMMY_COLOR)
+	dummy.bot = DummyBrain.new()
+	dummy.aim_mode = "bot"
+	dummy.facing = -1.0
 	_update_hud()
-	await get_tree().create_timer(RESPAWN_DELAY).timeout
-	if is_instance_valid(p):
-		p.respawn(arena.spawn_points()[p.slot])
+
+
+func remove_dummy() -> void:
+	if dummy == null:
+		return
+	players[dummy.slot] = null
+	dummy.queue_free()
+	dummy = null
+	start_round()
+
+
+## Nuovo round: tutti ricompaiono al loro punto di partenza con la vita piena.
+func start_round() -> void:
+	_round_id += 1
+	round_over = false
+	_banner.visible = false
+	var spawns := arena.spawn_points()
+	for p in participants():
+		p.respawn(spawns[p.slot])
+	_update_hud()
+
+
+func _on_player_damaged(_victim: Player, attacker: Player, amount: float) -> void:
+	if attacker != null and is_instance_valid(attacker):
+		damage_dealt[attacker.slot] += amount
+
+
+func _on_player_died(p: Player, cause: String) -> void:
+	_spawn_puff(p.global_position, p.color)
+	if cause == "fall":
+		falls[p.slot] += 1
+	var killer := p.last_attacker
+	if killer != null and is_instance_valid(killer) and killer != p:
+		kills[killer.slot] += 1
+	_update_hud()
+
+	var everyone := participants()
+	if everyone.size() <= 1:
+		# Da soli non ci sono round: si ricompare dopo un attimo.
+		await get_tree().create_timer(RESPAWN_DELAY).timeout
+		if is_instance_valid(p) and not p.alive:
+			p.respawn(arena.spawn_points()[p.slot])
+		return
+
+	if round_over:
+		return
+	var alive: Array[Player] = []
+	for q in everyone:
+		if q.alive:
+			alive.append(q)
+	if alive.size() > 1:
+		return
+
+	round_over = true
+	if alive.size() == 1:
+		var winner := alive[0]
+		wins[winner.slot] += 1
+		_banner.text = WIN_PHRASES.pick_random()
+		_banner.add_theme_color_override("font_color", winner.color)
+	else:
+		_banner.text = "PAREGGIO!"
+		_banner.add_theme_color_override("font_color", Color.WHITE)
+	_banner.visible = true
+	_update_hud()
+	var this_round := _round_id
+	await get_tree().create_timer(ROUND_END_DELAY).timeout
+	if round_over and this_round == _round_id:
+		start_round()
+
+
+## Sbuffo di fumo del colore del personaggio quando muore.
+func _spawn_puff(pos: Vector2, color: Color) -> void:
+	var cp := CPUParticles2D.new()
+	cp.one_shot = true
+	cp.amount = 32
+	cp.lifetime = 0.8
+	cp.explosiveness = 0.9
+	cp.spread = 180.0
+	cp.initial_velocity_min = 120.0
+	cp.initial_velocity_max = 340.0
+	cp.gravity = Vector2(0, -80)
+	cp.damping_min = 120.0
+	cp.damping_max = 200.0
+	cp.scale_amount_min = 8.0
+	cp.scale_amount_max = 16.0
+	var ramp := Gradient.new()
+	ramp.set_color(0, color)
+	ramp.set_color(1, Color(color, 0.0))
+	cp.color_ramp = ramp
+	var b := arena.bounds
+	cp.position = Vector2(clampf(pos.x, b.position.x + 40.0, b.end.x - 40.0), minf(pos.y - 50.0, b.end.y - 60.0))
+	add_child(cp)
+	cp.emitting = true
+	cp.finished.connect(cp.queue_free)
+
+
+func _short_name(p: Player) -> String:
+	return "Manichino" if p == dummy else COLOR_NAMES[p.slot]
 
 
 func _describe(kind: String, device: int) -> String:
@@ -102,13 +278,14 @@ func _describe(kind: String, device: int) -> String:
 
 func _update_hud() -> void:
 	var lines: Array[String] = []
-	lines.append("PROTOTIPO 1 - MOVIMENTO        R / Start = rimetti tutti al via")
-	if players.size() < MAX_PLAYERS:
+	lines.append("PROTOTIPO 2a - DANNI E ROUND      R / Start = nuovo round      F2 = manichino (premi ancora: cambia cosa fa)   F3 = togli manichino")
+	if _free_slot() >= 0:
 		lines.append("Per entrare: W o Spazio (tastiera + mouse)  -  Freccia SU (tastiera frecce)  -  A sul joystick")
-	lines.append("Tastiera + mouse: A/D muovi, W/Spazio salta, S giu, MIRA COL MOUSE, pugno clic sinistro (o F), SCUDO clic destro (o E)")
-	lines.append("Tastiera frecce: frecce muovi e mira (8 direzioni), Freccia su salta, pugno Invio, scudo Shift destro")
-	lines.append("Joystick: levetta sinistra muovi, levetta DESTRA mira a 360 gradi, A salta, X o RB pugno, B o LB scudo")
-	lines.append("Doppio salto. Contro un muro premi salto per saltare dal muro (tieni SU per scalare). Giu + salto = scendi. Pugno in basso in aria = rimbalzo")
-	for i in players.size():
-		lines.append("%s (%s): cadute %d" % [COLOR_NAMES[i], device_names[i], falls[i]])
+	lines.append("Tastiera + mouse: A/D muovi, W/Spazio salta, S giu, mira col mouse, pugno clic sinistro (o F), scudo clic destro (o E)")
+	lines.append("Tastiera frecce: frecce muovi e mira, Freccia su salta, pugno Invio, scudo Shift destro  |  Joystick: levette muovi/mira, A salta, X/RB pugno, B/LB scudo")
+	for p in participants():
+		var label: String = names[p.slot]
+		if p == dummy:
+			label = "Manichino (%s)" % dummy.bot.mode_name()
+		lines.append("%s:  vittorie %d  ·  eliminazioni %d  ·  cadute %d  ·  danni fatti %d" % [label, wins[p.slot], kills[p.slot], falls[p.slot], int(damage_dealt[p.slot])])
 	hud.text = "\n".join(lines)
