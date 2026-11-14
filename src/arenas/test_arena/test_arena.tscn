@@ -17,12 +17,18 @@ color = Color(0.09, 0.11, 0.18, 1)
 [node name="GroundLeft" type="StaticBody2D" parent="Platforms"]
 position = Vector2(120, 880)
 script = ExtResource("2_platform")
-size = Vector2(620, 200)
+size = Vector2(620, 420)
 
 [node name="GroundRight" type="StaticBody2D" parent="Platforms"]
 position = Vector2(1180, 880)
 script = ExtResource("2_platform")
-size = Vector2(620, 200)
+size = Vector2(620, 420)
+
+[node name="WallLeft" type="StaticBody2D" parent="Platforms"]
+position = Vector2(120, 300)
+script = ExtResource("2_platform")
+size = Vector2(50, 580)
+color = Color(0.32, 0.36, 0.5, 1)
 
 [node name="MiddleBlock" type="StaticBody2D" parent="Platforms"]
 position = Vector2(780, 610)

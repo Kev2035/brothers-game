@@ -58,6 +58,8 @@ func add_player(kind: String, device: int, key: String) -> Player:
 	var p: Player = PLAYER_SCENE.instantiate()
 	p.slot = slot
 	p.color = COLORS[slot]
+	p.aim_mode = InputSetup.aim_mode_for(kind)
+	p.device = device
 	p.death_y = arena.death_y
 	p.side_limits = arena.side_limits
 	add_child(p)
@@ -102,8 +104,11 @@ func _update_hud() -> void:
 	var lines: Array[String] = []
 	lines.append("PROTOTIPO 1 - MOVIMENTO        R / Start = rimetti tutti al via")
 	if players.size() < MAX_PLAYERS:
-		lines.append("Per entrare: W (tastiera WASD)  -  Freccia SU (tastiera frecce)  -  A sul joystick")
-	lines.append("Comandi: muovi, salta (2 volte = doppio salto), pugno: F / Invio / X sul joystick. Giu + salto = scendi dalla piattaforma")
+		lines.append("Per entrare: W o Spazio (tastiera + mouse)  -  Freccia SU (tastiera frecce)  -  A sul joystick")
+	lines.append("Tastiera + mouse: A/D muovi, W/Spazio salta, S giu, MIRA COL MOUSE, pugno clic sinistro (o F), SCUDO clic destro (o E)")
+	lines.append("Tastiera frecce: frecce muovi e mira (8 direzioni), Freccia su salta, pugno Invio, scudo Shift destro")
+	lines.append("Joystick: levetta sinistra muovi, levetta DESTRA mira a 360 gradi, A salta, X o RB pugno, B o LB scudo")
+	lines.append("Doppio salto. Contro un muro premi salto per saltare dal muro (tieni SU per scalare). Giu + salto = scendi. Pugno in basso in aria = rimbalzo")
 	for i in players.size():
 		lines.append("%s (%s): cadute %d" % [COLOR_NAMES[i], device_names[i], falls[i]])
 	hud.text = "\n".join(lines)

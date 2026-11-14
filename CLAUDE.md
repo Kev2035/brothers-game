@@ -23,7 +23,9 @@ Videogioco **personale di Kevin**. Progetto partito da zero il 2026-11-10: nient
 _In definizione._ Il nome "brothers-game" è provvisorio.
 
 - **Per chi**: pensato per far giocare Kevin (30 anni) e suo fratello (16) quando sono a casa insieme.
-- **Genere**: picchiaduro / sparatutto in arena, a turni brevi: **due personaggi uno contro l'altro**, la partita (round) finisce quando uno dei due muore.
+- **Genere**: picchiaduro / sparatutto in arena, a round brevi: **2-4 personaggi uno contro l'altro**, il round finisce quando ne resta vivo uno solo.
+- **Struttura della partita**: "infinita", come in Stick Fight. Si parte in una **lobby** (una piattaforma vuota) dove ci si può già combattere; la partita inizia quando qualcuno fa fuori un avversario. Poi le arene si susseguono round dopo round; ogni ~20 arene si torna alla lobby con classifica e statistiche. Si chiude quando si vuole, e si vede il vincitore.
+- **Vita**: barra della vita; pugni e proiettili tolgono vita (ogni arma il suo danno), a zero si muore. Cadere nel vuoto uccide sempre.
 - **Ispirazioni** (solo come riferimento, il gioco deve essere originale: niente personaggi, grafica, livelli o nomi copiati):
   - *Stick Fight: The Game*: duello in un'arena, armi che cadono dal cielo, ambientazioni che cambiano durante la partita.
   - *Metal Slug*: controlli semplici. La pixel art è stata scartata il 2026-11-11.
@@ -35,7 +37,7 @@ _In definizione._ Il nome "brothers-game" è provvisorio.
 - **Armi standardizzate**: ogni arma è un solo disegno, con il punto di impugnatura e il punto da cui esce il colpo. Si aggancia alla "mano" del personaggio, che ruota per mirare. Poche famiglie di armi (una mano, due mani, corpo a corpo, da lancio), con un'animazione condivisa per famiglia. Qualsiasi personaggio usa qualsiasi arma.
 - **Personaggi**: all'inizio tutti uguali, cambia solo il colore. Esiste comunque una "scheda personaggio" (`Resource`), pronta ad accogliere in futuro skin o statistiche.
 - **Grafica e audio**: Kevin non disegna. Si useranno pacchetti gratuiti già pronti e/o immagini generate con l'IA e scontornate da Kevin. Bisogna sempre controllare la licenza di ogni risorsa (anche i termini d'uso dello strumento di IA) e annotarla.
-- **Armi**: cadono dal cielo durante il round; tipi diversi con poteri diversi, da saper usare bene.
+- **Armi**: cadono dal cielo durante il round; tipi diversi con poteri diversi, da saper usare bene. Le prime 3: pistola, mitra, fucile a pompa.
 - **Ambientazioni (arene)**: una sola schermata fissa per round, senza esplorazione. Piattaforme su cui salire ed elementi tipici di ogni ambientazione. Possono essere **dinamiche e distruttibili** (es. colonne di ghiaccio che si rompono a colpi d'arma e fanno precipitare l'avversario). **Cadere nel vuoto uccide** ed è uno dei modi principali per morire. Nel riferimento ce ne sono 50-70; il numero per noi è da definire.
 
 ## Piattaforma (dove si gioca)
