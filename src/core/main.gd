@@ -28,6 +28,8 @@ const LOBBY_SCENE := preload("res://src/arenas/lobby/lobby.tscn")
 ## così anche con tante arene il gioco parte subito e non si blocca.
 const ARENA_PATHS: Array[String] = [
 	"res://src/arenas/bosco/radici.tscn",
+	"res://src/arenas/bosco/tronchi.tscn",
+	"res://src/arenas/bosco/piattaforme.tscn",
 	"res://src/arenas/test_arena/test_arena.tscn",
 	"res://src/arenas/torri/torri.tscn",
 	"res://src/arenas/ponti/ponti.tscn",

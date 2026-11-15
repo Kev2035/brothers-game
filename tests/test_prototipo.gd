@@ -539,6 +539,7 @@ func _run() -> void:
 
 	await _test_armi_bosco(p0, p1)
 	await _test_radici()
+	await _test_bosco_2_3()
 	await _test_lobby_e_partita()
 	await _test_menu_pausa()
 
@@ -1024,3 +1025,102 @@ func _test_radici() -> void:
 	main.start_round()
 	await frames(3)
 	check(_fixed_pickups().size() == 1 and a.weapon == null, "nuovo round: la spada fissa torna al centro")
+
+
+## Carica un'arena da sola (senza lobby) con due giocatori. Ritorna [a, b].
+func _open_arena(path: String) -> Array:
+	main.queue_free()
+	await frames(3)
+	main = load("res://src/core/main.tscn").instantiate()
+	main.fixed_arena = load(path)
+	root.add_child(main)
+	await frames(2)
+	main.auto_weapons = false
+	var a = main.add_player("kb_b", -1, "kb_b")
+	var b = main.add_player("joy", 0, "joy_0")
+	await frames(60)
+	return [a, b]
+
+
+## Controlla che dal cielo cadano solo le armi permesse (nomi dei file .tres).
+func _only_weapons(allowed: Array) -> bool:
+	var ok := true
+	for i in 40:
+		var pk = main.spawn_weapon()
+		var file: String = pk.data.resource_path.get_file().get_basename()
+		if not allowed.has(file):
+			ok = false
+		pk.queue_free()
+	await frames(2)
+	return ok
+
+
+## Livelli 2 e 3 del bosco.
+func _test_bosco_2_3() -> void:
+	const BOSCO_2 := ["sling", "wooden_sword", "knife", "axe"]
+	check(main.ARENA_PATHS[1].ends_with("tronchi.tscn") and main.ARENA_PATHS[2].ends_with("piattaforme.tscn"), "i livelli 2 e 3 del bosco vengono dopo Le radici")
+
+	# --- Livello 2: I tronchi sottili ---
+	var pl: Array = await _open_arena("res://src/arenas/bosco/tronchi.tscn")
+	var a = pl[0]
+	var b = pl[1]
+	check(main.arena.arena_name == "I tronchi sottili" and a.is_on_floor() and b.is_on_floor(), "Tronchi: si parte in piedi sulla base")
+	check(await _only_weapons(BOSCO_2), "Tronchi: cadono solo fionde, spade di legno, coltelli e asce")
+	check(a._wall_side() == 0, "Tronchi: si parte in mezzo a due alberi, staccati dai tronchi")
+	# Non si passa da un corridoio all'altro camminando: i tronchi sono muri.
+	var x_start: float = a.global_position.x
+	Input.action_press("p0_left")
+	await frames(60)
+	Input.action_release("p0_left")
+	check(a.global_position.x > 1160.0 and a.global_position.x < x_start - 50.0, "Tronchi: i tronchi sono muri (ci si ferma a x=%.0f)" % a.global_position.x)
+	# Si sale rimbalzando da un tronco all'altro col salto dai muri.
+	var dir := -1.0
+	var t := 0
+	var since := 99
+	Input.action_press("p0_jump")
+	await frames(3)
+	Input.action_release("p0_jump")
+	while t < 900 and not (a.is_on_floor() and a.global_position.y < 600.0):
+		since += 1
+		Input.action_release("p0_left")
+		Input.action_release("p0_right")
+		Input.action_press("p0_left" if dir < 0.0 else "p0_right")
+		if since == 2:
+			Input.action_release("p0_jump")
+			Input.action_release("p0_up")
+		if since > 4 and not a.is_on_floor() and a._wall_side() == int(dir):
+			Input.action_press("p0_up") # sulla tastiera il tasto del salto è anche "su"
+			Input.action_press("p0_jump")
+			since = 0
+			dir = -dir
+		elif since > 20 and a.is_on_floor():
+			Input.action_press("p0_jump") # ricaduto a terra: si riparte
+			since = 0
+		await physics_frame
+		t += 1
+	Input.action_release("p0_left")
+	Input.action_release("p0_right")
+	Input.action_release("p0_jump")
+	Input.action_release("p0_up")
+	print("    Tronchi: in cima in %.1f s rimbalzando tra due tronchi (y=%.0f)" % [t / 60.0, a.global_position.y])
+	check(a.is_on_floor() and a.global_position.y < 600.0 and t < 240, "Tronchi: si arriva in cima rimbalzando tra i tronchi (%.1f s)" % (t / 60.0))
+
+	# --- Livello 3: Il bosco delle piattaforme ---
+	pl = await _open_arena("res://src/arenas/bosco/piattaforme.tscn")
+	a = pl[0]
+	b = pl[1]
+	check(main.arena.arena_name == "Il bosco delle piattaforme" and a.is_on_floor() and b.is_on_floor(), "Piattaforme: si parte sulle due piattaforme laterali in basso")
+	check(a.global_position.x < 700.0 and b.global_position.x > 2500.0, "Piattaforme: uno a sinistra e uno a destra")
+	check(await _only_weapons(BOSCO_2), "Piattaforme: cadono solo le armi del bosco")
+	# Dalla partenza si sale fino in cima saltando di piattaforma in piattaforma.
+	a.global_position = Vector2(330, 1148) # piattaforma sul primo albero
+	a.velocity = Vector2.ZERO
+	await frames(20)
+	check(a.is_on_floor(), "Piattaforme: si sta sulle piattaforme degli alberi")
+	# In mezzo c'è il vuoto: cadere uccide.
+	var falls_before: int = main.falls[1]
+	b.global_position = Vector2(1800, 1500)
+	b.velocity = Vector2.ZERO
+	await _wait_for(func(): return not b.alive, 3.0)
+	check(not b.alive and main.falls[1] == falls_before + 1, "Piattaforme: si puo cadere nel vuoto")
+	await create_timer(2.8).timeout

@@ -142,6 +142,20 @@ Costruendo le armi Claude ha aggiunto due numeri che nella tabella mancavano: **
 - **Terreno pieno**: in questo livello non c'è il vuoto, si muore solo per i colpi (il documento parla di vuoto solo dal livello 3).
 - I due alberi laterali sono muri veri: ci si può arrampicare col salto dai muri.
 
+### Livelli 2 e 3: scelte fatte costruendoli (2026-11-15)
+
+**Livello 2 "I tronchi sottili"** (`src/arenas/bosco/tronchi.tscn`)
+- 8 tronchi larghi 80 px, con 240 px di spazio tra uno e l'altro (feedback di Kevin: prima erano 6, più sottili e più lontani, e salire era troppo difficile). A questa distanza rimbalzare da un tronco all'altro fa salire in fretta.
+- I tronchi sono **muri veri dalla base fino alle piattaforme in cima** (1040 px): ogni spazio tra due alberi è un "pozzo" chiuso, da un pozzo all'altro si passa solo dall'alto. Sopra le piattaforme e sotto la base il tronco continua, ma è solo disegnato.
+- Si parte ognuno nel suo pozzo (i primi due giocatori nel 3° e nel 5°, il pozzo centrale resta libero): l'inizio è una gara a chi arriva prima in cima.
+- In cima una piattaforma per albero (200 px), con 120 px di buco tra una e l'altra: le armi cadono sulle piattaforme o in fondo ai pozzi.
+- Ai due lati restano due zone larghe con solo la base: ci si finisce cadendo dall'alto e si risale scalando il tronco esterno.
+
+**Livello 3 "Il bosco delle piattaforme"** (`src/arenas/bosco/piattaforme.tscn`)
+- 5 alberoni larghi 260 px, **solo disegnati** (non sono muri): fanno da sfondo alle piattaforme.
+- 15 piattaforme su 4 piani: alcune su un solo albero (220 px), altre a ponte tra due alberi (590-680 px). Si attraversano tutte da sotto.
+- Sotto c'è il **vuoto**. Si parte dalle due piattaforme laterali in basso (solide), due giocatori per lato.
+
 ### Quali armi cadono in quale livello *(proposta di Claude, da bilanciare)*
 
 Le armi dei primi livelli diventano **sempre più rare** salendo, e poi spariscono.

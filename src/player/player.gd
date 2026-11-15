@@ -33,12 +33,13 @@ signal damaged(victim: Player, attacker: Player, amount: float)
 @export var jump_buffer := 0.12 ## premi un attimo prima di atterrare e salta lo stesso
 
 @export_group("Salto dai muri")
-@export var wall_jump_height := 150.0 ## salto dal muro senza SU: ti lanci via dal muro
+@export var wall_jump_height := 210.0 ## salto dal muro normale: ti lanci verso l'altra parete, salendo
 @export var wall_jump_push := 650.0 ## quanto ti spinge via dal muro
-@export var wall_climb_height := 130.0 ## tenendo SU (scalata): quanto sali a ogni salto...
+@export var wall_climb_height := 130.0 ## tenendo la direzione VERSO il muro (scalata): quanto sali a ogni salto...
 @export var wall_climb_push := 400.0 ## ...e quanto ti stacchi: più è alto, più la scalata è faticosa
 @export var wall_jump_lock := 0.18 ## secondi in cui non puoi subito tornare verso il muro
-@export var wall_detect := 6.0 ## distanza (pixel) entro cui sei "attaccato" al muro
+@export var wall_detect := 28.0 ## distanza (pixel) entro cui il muro "vale": non serve toccarlo al millimetro
+@export var wall_slide_speed := 500.0 ## spingendo contro un muro scivoli giù al massimo a questa velocità (0 = niente)
 
 @export_group("Scudo")
 @export var shield_duration := 0.45 ## secondi prima che l'arco sparisca del tutto
@@ -186,14 +187,19 @@ func _physics_process(delta: float) -> void:
 	# poi dal muro, poi doppio salto in aria.
 	var jump_now := not stunned and _just("jump")
 	var wall_side := 0 if on_floor else _wall_side()
+	# Stai per toccare un muro? Allora il salto premuto un attimo prima non si spreca
+	# come doppio salto: aspetta il muro e diventa un salto dal muro.
+	var wall_soon := not on_floor and wall_side == 0 and _wall_ahead()
 	if _buffer > 0.0 and _coyote > 0.0:
 		velocity.y = -_jump_velocity
 		_buffer = 0.0
 		_coyote = 0.0
 		_jump_held_cut = true
 		_squash = -0.6
-	elif jump_now and _coyote <= 0.0 and wall_side != 0:
-		var climbing := _held("up")
+	elif _buffer > 0.0 and _coyote <= 0.0 and wall_side != 0:
+		# Spingi VERSO il muro = scalata a piccoli salti sullo stesso muro.
+		# Altrimenti = salto forte verso la parete di fronte.
+		var climbing := absf(input_x) > 0.3 and signf(input_x) == float(wall_side)
 		var h := wall_climb_height if climbing else wall_jump_height
 		velocity.y = -sqrt(2.0 * _gravity * h)
 		velocity.x = -float(wall_side) * (wall_climb_push if climbing else wall_jump_push)
@@ -202,7 +208,7 @@ func _physics_process(delta: float) -> void:
 		_buffer = 0.0
 		_jump_held_cut = false # dal muro il salto ha sempre la stessa altezza, anche toccando appena il tasto
 		_squash = -0.5
-	elif jump_now and _coyote <= 0.0 and _air_jumps > 0 and _drop_timer <= 0.0:
+	elif jump_now and _coyote <= 0.0 and _air_jumps > 0 and _drop_timer <= 0.0 and not wall_soon:
 		velocity.y = -_double_jump_velocity
 		_air_jumps -= 1
 		_buffer = 0.0
@@ -224,6 +230,11 @@ func _physics_process(delta: float) -> void:
 			g *= 1.5
 			limit = fast_fall_speed
 		velocity.y = minf(velocity.y + g * delta, limit)
+		# Scivolata sul muro: spingendo contro una parete si scende piano,
+		# così c'è il tempo di premere il salto.
+		if wall_slide_speed > 0.0 and wall_side != 0 and is_on_wall() and not down_held \
+				and absf(input_x) > 0.3 and signf(input_x) == float(wall_side):
+			velocity.y = minf(velocity.y, wall_slide_speed)
 
 	# Movimento orizzontale con accelerazione (scattante ma non a scatti).
 	var accel: float
@@ -355,6 +366,14 @@ func _wall_side() -> int:
 		if c and not (c.get_collider() as Node).is_in_group("bounds"):
 			return side # i bordi invisibili dell'arena non contano come muri
 	return 0
+
+
+## Sto volando verso un muro e lo toccherò entro il tempo del "buffer" del salto?
+func _wall_ahead() -> bool:
+	if absf(velocity.x) < 50.0:
+		return false
+	var c := move_and_collide(Vector2(velocity.x * jump_buffer, 0.0), true)
+	return c != null and not (c.get_collider() as Node).is_in_group("bounds") and absf(c.get_normal().x) > 0.7
 
 
 func is_shielding() -> bool:
