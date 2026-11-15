@@ -79,21 +79,31 @@ func _think_attack(me: Player) -> void:
 	aim = d.normalized()
 	var dir := signf(d.x)
 
-	# Con un'arma: resta a distanza e spara.
+	# Con un'arma: si tiene alla distanza giusta per quell'arma e attacca.
 	if me.weapon != null:
-		var keep := 250.0 if me.weapon.bullet_range < 1000.0 else 650.0
-		if absf(d.x) > keep and not (me.is_on_floor() and _edge_ahead(me, dir)):
+		var w := me.weapon
+		if absf(d.x) > w.bot_keep_distance() and not (me.is_on_floor() and _edge_ahead(me, dir)):
 			move_x = dir
 		if d.y < -110.0 and _timer <= 0.0:
 			_press("jump")
 			_held["jump"] = true
 			_timer = 0.6
-		if d.length() < me.weapon.bullet_range * 0.9:
-			if me.weapon.automatic:
-				_held["attack"] = true
-			elif _attack_timer <= 0.0:
-				_press("attack")
-				_attack_timer = me.weapon.fire_interval + _rng.randf_range(0.15, 0.4)
+		if d.length() < w.bot_range():
+			match w.bot_style():
+				&"hold":
+					_held["attack"] = true
+				&"charge":
+					# Mira un po' più in alto (la pietra cade), carica per mezzo secondo e lascia.
+					aim = (aim + Vector2(0.0, -w.bot_aim_lift(d.length()))).normalized()
+					if _attack_timer <= 0.0:
+						_press("attack")
+						_attack_timer = 1.0
+					elif _attack_timer > 0.45:
+						_held["attack"] = true
+				_:
+					if _attack_timer <= 0.0:
+						_press("attack")
+						_attack_timer = w.fire_interval + _rng.randf_range(0.15, 0.4)
 		return
 
 	if absf(d.x) > 80.0:

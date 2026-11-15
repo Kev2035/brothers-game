@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="GunData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/weapons/gun_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+display_name = "Balestra"
+family = 1
+damage = 40.0
+fire_interval = 1.2
+ammo = 5
+look = 5
+length = 84.0
+thickness = 14.0
+color = Color(0.62, 0.43, 0.26, 1)
+accent = Color(0.8, 0.84, 0.9, 1)
+pellets = 1
+spread_deg = 0.0
+automatic = false
+bullet_speed = 3200.0
+bullet_range = 3200.0
+speed_jitter = 0.0
+bullet_gravity = 0.0
+bullet_radius = 0.0
+bullet_color = Color(1, 0.91, 0.69, 1)
+muzzle_flash = false
+recoil = 250.0
+recoil_air_mult = 1.5

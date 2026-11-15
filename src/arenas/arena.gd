@@ -10,6 +10,14 @@ extends Node2D
 @export var top_margin := 450.0 ## quanto si può salire sopra lo schermo
 @export var death_margin := 250.0 ## quanto sotto il bordo dello schermo si muore
 
+@export_group("Armi")
+## false = in questa arena non cade nessuna arma dal cielo.
+@export var sky_weapons_enabled := true
+## Quali armi cadono dal cielo in questa arena: arma -> "peso" (più è alto, più
+## spesso esce; es. fionda 3 e coltello 1 = tre fionde ogni coltello).
+## Vuoto = le armi di base del gioco.
+@export var sky_weapons: Dictionary[WeaponData, float] = {}
+
 ## L'area inquadrata nel "mondo" (tiene conto di dove si trova l'arena:
 ## durante il cambio di arena quella nuova sta accanto a quella vecchia).
 var world_bounds: Rect2:
@@ -51,6 +59,28 @@ func clip_background(left_x := -INF, right_x := INF) -> void:
 	var full_right: float = bg.get_meta("full_right")
 	bg.offset_left = maxf(full_left, left_x - global_position.x)
 	bg.offset_right = minf(full_right, right_x - global_position.x)
+
+
+## Sceglie a caso (rispettando i pesi) la prossima arma che cade dal cielo.
+func pick_sky_weapon(defaults: Array[WeaponData]) -> WeaponData:
+	if sky_weapons.is_empty():
+		return defaults.pick_random()
+	var total := 0.0
+	for w in sky_weapons:
+		total += sky_weapons[w]
+	var roll := randf() * total
+	for w in sky_weapons:
+		roll -= sky_weapons[w]
+		if roll <= 0.0:
+			return w
+	return sky_weapons.keys().back()
+
+
+## Rimette al loro posto le armi fisse del livello (a ogni inizio round).
+func place_fixed_weapons() -> void:
+	for node in get_tree().get_nodes_in_group("fixed_weapons"):
+		if is_ancestor_of(node):
+			(node as FixedWeapon).place()
 
 
 func spawn_points() -> Array[Vector2]:

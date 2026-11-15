@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="MeleeData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/weapons/melee_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+display_name = "Spada di legno"
+family = 0
+damage = 20.0
+fire_interval = 0.2
+ammo = 0
+look = 1
+length = 120.0
+thickness = 16.0
+color = Color(0.85, 0.68, 0.42, 1)
+accent = Color(0.55, 0.38, 0.22, 1)
+reach = 170.0
+cone_deg = 50.0
+swing_time = 0.12
+swing_arc_deg = 110.0

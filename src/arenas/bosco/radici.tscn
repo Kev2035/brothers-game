@@ -1,0 +1,148 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://src/arenas/arena.gd" id="1_arena"]
+[ext_resource type="Script" path="res://src/objects/platform.gd" id="2_platform"]
+[ext_resource type="Script" path="res://src/weapons/weapon_data.gd" id="3_wdata"]
+[ext_resource type="Resource" path="res://src/weapons/sling.tres" id="4_sling"]
+[ext_resource type="Script" path="res://src/weapons/fixed_weapon.gd" id="5_fixed"]
+[ext_resource type="Resource" path="res://src/weapons/wooden_sword.tres" id="6_sword"]
+
+[node name="Radici" type="Node2D"]
+script = ExtResource("1_arena")
+arena_name = "Le radici"
+bounds = Rect2(0, 0, 3200, 1800)
+sky_weapons = Dictionary[ExtResource("3_wdata"), float]({
+ExtResource("4_sling"): 1.0
+})
+
+[node name="Background" type="ColorRect" parent="."]
+offset_left = -1000.0
+offset_top = -1000.0
+offset_right = 4200.0
+offset_bottom = 2800.0
+mouse_filter = 2
+color = Color(0.2, 0.31, 0.3, 1)
+
+[node name="Decor" type="Node2D" parent="."]
+z_index = -5
+
+[node name="CenterTrunk" type="ColorRect" parent="Decor"]
+offset_left = 1500.0
+offset_top = -1000.0
+offset_right = 1700.0
+offset_bottom = 1550.0
+mouse_filter = 2
+color = Color(0.3, 0.22, 0.15, 1)
+
+[node name="CenterRoots" type="Polygon2D" parent="Decor"]
+color = Color(0.3, 0.22, 0.15, 1)
+polygon = PackedVector2Array(1280, 1550, 1500, 1330, 1700, 1330, 1920, 1550)
+
+[node name="LeftRoots" type="Polygon2D" parent="Decor"]
+color = Color(0.36, 0.25, 0.16, 1)
+polygon = PackedVector2Array(220, 1550, 220, 1380, 480, 1550)
+
+[node name="RightRoots" type="Polygon2D" parent="Decor"]
+color = Color(0.36, 0.25, 0.16, 1)
+polygon = PackedVector2Array(2980, 1550, 2980, 1380, 2720, 1550)
+
+[node name="Platforms" type="Node2D" parent="."]
+
+[node name="Ground" type="StaticBody2D" parent="Platforms"]
+position = Vector2(-250, 1550)
+script = ExtResource("2_platform")
+size = Vector2(3700, 600)
+color = Color(0.25, 0.18, 0.12, 1)
+
+[node name="TrunkLeft" type="StaticBody2D" parent="Platforms"]
+position = Vector2(-250, -700)
+script = ExtResource("2_platform")
+size = Vector2(470, 2250)
+color = Color(0.36, 0.25, 0.16, 1)
+
+[node name="TrunkRight" type="StaticBody2D" parent="Platforms"]
+position = Vector2(2980, -700)
+script = ExtResource("2_platform")
+size = Vector2(470, 2250)
+color = Color(0.36, 0.25, 0.16, 1)
+
+[node name="Left1" type="StaticBody2D" parent="Platforms"]
+position = Vector2(220, 1300)
+script = ExtResource("2_platform")
+size = Vector2(450, 24)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+
+[node name="Left2" type="StaticBody2D" parent="Platforms"]
+position = Vector2(220, 1050)
+script = ExtResource("2_platform")
+size = Vector2(300, 24)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+
+[node name="Left3" type="StaticBody2D" parent="Platforms"]
+position = Vector2(220, 800)
+script = ExtResource("2_platform")
+size = Vector2(560, 24)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+
+[node name="LeftTop" type="StaticBody2D" parent="Platforms"]
+position = Vector2(220, 540)
+script = ExtResource("2_platform")
+size = Vector2(930, 28)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+
+[node name="Right1" type="StaticBody2D" parent="Platforms"]
+position = Vector2(2600, 1280)
+script = ExtResource("2_platform")
+size = Vector2(380, 24)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+
+[node name="Right2" type="StaticBody2D" parent="Platforms"]
+position = Vector2(2680, 1030)
+script = ExtResource("2_platform")
+size = Vector2(300, 24)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+
+[node name="Right3" type="StaticBody2D" parent="Platforms"]
+position = Vector2(2400, 790)
+script = ExtResource("2_platform")
+size = Vector2(580, 24)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+
+[node name="RightTop" type="StaticBody2D" parent="Platforms"]
+position = Vector2(2050, 540)
+script = ExtResource("2_platform")
+size = Vector2(930, 28)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+
+[node name="Center" type="StaticBody2D" parent="Platforms"]
+position = Vector2(1380, 900)
+script = ExtResource("2_platform")
+size = Vector2(440, 40)
+color = Color(0.72, 0.5, 0.26, 1)
+
+[node name="FixedSword" type="Marker2D" parent="."]
+position = Vector2(1600, 868)
+script = ExtResource("5_fixed")
+weapon = ExtResource("6_sword")
+
+[node name="Spawns" type="Node2D" parent="."]
+
+[node name="Spawn1" type="Marker2D" parent="Spawns"]
+position = Vector2(500, 1548)
+
+[node name="Spawn2" type="Marker2D" parent="Spawns"]
+position = Vector2(2700, 1548)
+
+[node name="Spawn3" type="Marker2D" parent="Spawns"]
+position = Vector2(1000, 1548)
+
+[node name="Spawn4" type="Marker2D" parent="Spawns"]
+position = Vector2(2200, 1548)

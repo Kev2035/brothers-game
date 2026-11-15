@@ -11,6 +11,8 @@ var ammo := -1 ## colpi rimasti (-1 = caricatore pieno, per le armi nuove)
 ## Chi ha appena lasciato quest'arma non la riprende finché non se ne allontana.
 var ignore_player: Player = null
 var death_y := 99999.0
+## true = arma fissa nel livello: non cade, resta sospesa dove è stata messa.
+var fixed := false
 var _bob := 0.0
 
 
@@ -34,6 +36,8 @@ func _ready() -> void:
 	mat.bounce = 0.0
 	mat.friction = 1.0
 	physics_material_override = mat
+	if fixed:
+		freeze = true
 
 
 func _physics_process(delta: float) -> void:

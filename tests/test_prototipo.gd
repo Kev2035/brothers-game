@@ -13,10 +13,16 @@ var main: Node
 const GROUND := 1448.0 # piedi appoggiati sul terreno (y)
 const PIT_X := 1600.0 # centro del pozzo
 const WALL_X := 386.0 # appena a destra del muro alto (faccia a x=360)
+# Le tre arene grezze di prova: le prove su lobby, partita e menu usano queste.
+var OLD_ARENAS: Array[String] = [
+	"res://src/arenas/test_arena/test_arena.tscn",
+	"res://src/arenas/torri/torri.tscn",
+	"res://src/arenas/ponti/ponti.tscn",
+]
 
 
 func _initialize() -> void:
-	create_timer(240.0).timeout.connect(func():
+	create_timer(400.0).timeout.connect(func():
 		print("TIMEOUT")
 		quit(2))
 	_run()
@@ -531,6 +537,8 @@ func _run() -> void:
 	check(p0.weapon != null, "allontanandosi e tornando l'arma lasciata si riprende")
 	main.start_round()
 
+	await _test_armi_bosco(p0, p1)
+	await _test_radici()
 	await _test_lobby_e_partita()
 	await _test_menu_pausa()
 
@@ -566,6 +574,7 @@ func _test_lobby_e_partita() -> void:
 	await frames(3)
 	main = load("res://src/core/main.tscn").instantiate()
 	main.arenas_per_lobby = 2
+	main.arena_paths = OLD_ARENAS
 	root.add_child(main)
 	await frames(2)
 	check(main.phase == main.Phase.LOBBY and main.arena.arena_name == "Lobby", "il gioco parte nella lobby")
@@ -663,7 +672,7 @@ func _test_lobby_e_partita() -> void:
 			repeats += 1
 		prev = sc
 		seen[sc] = true
-	check(repeats == 0 and seen.size() == main.ARENA_PATHS.size(), "ordine a caso: escono tutte e mai due uguali di fila")
+	check(repeats == 0 and seen.size() == main.arena_paths.size(), "ordine a caso: escono tutte e mai due uguali di fila")
 
 
 ## Simula un tasto premuto e lasciato (come se lo premesse Kevin).
@@ -692,6 +701,7 @@ func _test_menu_pausa() -> void:
 	main.queue_free()
 	await frames(3)
 	main = load("res://src/core/main.tscn").instantiate()
+	main.arena_paths = OLD_ARENAS
 	root.add_child(main)
 	await frames(2)
 	var a = main.add_player("kb_b", -1, "kb_b")
@@ -717,7 +727,7 @@ func _test_menu_pausa() -> void:
 	count.pressed.emit()
 	check(main.random_order and main.arenas_per_lobby == 5 and order.text.ends_with("a caso"), "il menu cambia ordine delle arene e numero di arene (%d)" % main.arenas_per_lobby)
 	order.pressed.emit()
-	check(not main.random_order and main._next_path == main.ARENA_PATHS[0], "tornando all'ordine fisso si riparte dalla prima arena")
+	check(not main.random_order and main._next_path == main.arena_paths[0], "tornando all'ordine fisso si riparte dalla prima arena")
 	await _press_key(KEY_ESCAPE)
 	check(menu.page == "main" and paused, "Esc nelle impostazioni torna alla pagina principale")
 	await _press_key(KEY_ESCAPE)
@@ -766,3 +776,251 @@ func _test_menu_pausa() -> void:
 	check(not main.scoreboard.visible, "nuova partita: nella lobby non c'e la classifica vecchia")
 	await create_timer(3.0).timeout
 	check(main.phase == main.Phase.LOBBY and main.arena.arena_name == "Lobby", "il vecchio round non fa partire niente dopo la nuova partita")
+
+
+## Mette i due giocatori uno di fronte all'altro, a `dist` pixel, in un round nuovo.
+func _face_off(p0, p1, dist: float, weapon: WeaponData) -> void:
+	main.start_round()
+	await frames(20)
+	main._spawn_timer = 999.0
+	p0.global_position = Vector2(700, GROUND)
+	p1.global_position = Vector2(700 + dist, GROUND)
+	p0.facing = 1.0
+	p1.facing = -1.0
+	p0.equip(weapon)
+	await frames(5)
+
+
+## Blocco A: armi corpo a corpo, fionda (carica e curva), balestra (ricarica).
+func _test_armi_bosco(p0, p1) -> void:
+	var SWORD: WeaponData = load("res://src/weapons/wooden_sword.tres")
+	var KNIFE: WeaponData = load("res://src/weapons/knife.tres")
+	var AXE: WeaponData = load("res://src/weapons/axe.tres")
+	var SLING: ChargeData = load("res://src/weapons/sling.tres")
+	var CROSSBOW: WeaponData = load("res://src/weapons/crossbow.tres")
+	check(SWORD is MeleeData and SLING is ChargeData and CROSSBOW is GunData and main.WEAPONS[0] is GunData, "ogni arma ha la scheda della sua famiglia")
+	print("    colpi per uccidere: spada %d, coltello %d, ascia %d, fionda %d, balestra %d" % [SWORD.hits_to_kill(), KNIFE.hits_to_kill(), AXE.hits_to_kill(), SLING.hits_to_kill(), CROSSBOW.hits_to_kill()])
+	check(SWORD.hits_to_kill() == 5 and KNIFE.hits_to_kill() == 3 and AXE.hits_to_kill() == 2 and CROSSBOW.hits_to_kill() == 3, "colpi per uccidere come nel documento del bosco")
+
+	# Spada di legno: arriva più lontano del pugno, 20 di danno, non si consuma.
+	await _face_off(p0, p1, 190.0, SWORD)
+	await tap("p0_attack")
+	await frames(3)
+	check(is_equal_approx(p1.health, 80.0), "la spada di legno colpisce piu lontano del pugno (vita P1 %.0f)" % p1.health)
+	check(absf(p1.global_position.x - 890.0) < 2.0, "la spada non sposta chi colpisce")
+	for i in 3:
+		await frames(14)
+		await tap("p0_attack")
+	check(p0.weapon == SWORD and is_equal_approx(p1.health, 20.0), "la spada non si consuma (vita P1 %.0f)" % p1.health)
+
+	# Lo scudo para la spada.
+	await _face_off(p0, p1, 150.0, SWORD)
+	await tap("p1_shield")
+	await tap("p0_attack")
+	await frames(3)
+	check(p1.health == 100.0, "lo scudo para la spada")
+
+	# Coltello: portata corta, 34 di danno, veloce.
+	await _face_off(p0, p1, 190.0, KNIFE)
+	await tap("p0_attack")
+	await frames(3)
+	check(p1.health == 100.0, "il coltello ha la portata corta (a 190 px non arriva)")
+	await _face_off(p0, p1, 100.0, KNIFE)
+	for i in 3:
+		await tap("p0_attack")
+		await frames(9)
+	check(not p1.alive, "3 coltellate = eliminato")
+	await create_timer(2.8).timeout
+
+	# Ascia: 50 di danno, lenta.
+	await _face_off(p0, p1, 210.0, AXE)
+	await tap("p0_attack")
+	await frames(12)
+	await tap("p0_attack") # troppo presto: l'ascia è lenta
+	await frames(3)
+	check(is_equal_approx(p1.health, 50.0), "l'ascia toglie 50 ed e' lenta (vita P1 %.0f)" % p1.health)
+	await frames(30)
+	await tap("p0_attack")
+	await frames(3)
+	check(not p1.alive, "2 colpi d'ascia = eliminato")
+	await create_timer(2.8).timeout
+
+	# Fionda: toccando appena il tasto la pietra cade subito; caricando arriva.
+	await _face_off(p0, p1, 500.0, SLING)
+	await tap("p0_attack")
+	await frames(40)
+	check(p1.health == 100.0 and p0.ammo == SLING.ammo - 1, "fionda senza carica: la pietra cade prima di arrivare")
+	# A raffica: toccando il tasto di continuo partono tante pietre al secondo.
+	var ammo_start: int = p0.ammo
+	for i in 60:
+		if i % 6 == 0:
+			Input.action_press("p0_attack")
+		elif i % 6 == 3:
+			Input.action_release("p0_attack")
+		await physics_frame
+	Input.action_release("p0_attack")
+	await frames(40)
+	print("    fionda a raffica: %d pietre in 1 s" % (ammo_start - p0.ammo))
+	check(ammo_start - p0.ammo >= 5 and SLING.ammo >= 30, "la fionda si puo usare a raffica e ha tante pietre")
+	await _face_off(p0, p1, 300.0, SLING)
+	Input.action_press("p0_attack")
+	await frames(10)
+	var half_charge: float = p0.charge
+	var preview_n: int = p0.aim_preview.size()
+	await frames(30)
+	check(half_charge > 0.3 and half_charge < 0.8 and is_equal_approx(p0.charge, 1.0), "tenendo premuto la fionda si carica (%.2f -> %.2f)" % [half_charge, p0.charge])
+	check(preview_n >= 3, "mentre carichi si vede la traiettoria (%d punti)" % preview_n)
+	Input.action_release("p0_attack")
+	await frames(1)
+	var stones := get_nodes_in_group("bullets")
+	check(stones.size() == 1 and stones[0].gravity > 0.0, "lasciando il tasto parte la pietra, che cade per gravita")
+	await frames(25)
+	check(is_equal_approx(p1.health, 80.0) and p0.aim_preview.is_empty(), "fionda carica: la pietra arriva e colpisce (vita P1 %.0f)" % p1.health)
+
+	# La pietra fa una curva: tirata in diagonale verso l'alto sale e poi ricade,
+	# e arriva dove diceva la linea tratteggiata.
+	main.start_round()
+	await frames(20)
+	main._spawn_timer = 999.0
+	p1.global_position = Vector2(2600, GROUND)
+	p0.global_position = Vector2(1900, GROUND)
+	p0.equip(SLING)
+	# Con le frecce si mira in diagonale tenendo SU + DESTRA (intanto il personaggio corre).
+	Input.action_press("p0_up")
+	Input.action_press("p0_right")
+	await frames(3)
+	# Carica minima: la linea (1,3 s di volo) arriva fino a dove la pietra tocca terra.
+	Input.action_press("p0_attack")
+	await frames(2)
+	var predicted: Vector2 = p0.global_position + p0.aim_preview[p0.aim_preview.size() - 1]
+	var aim_now: Vector2 = p0.aim
+	Input.action_release("p0_attack")
+	await frames(1)
+	Input.action_release("p0_up")
+	Input.action_release("p0_right")
+	var flying := get_nodes_in_group("bullets")
+	var stone = flying[0] if flying.size() == 1 else null
+	var had_stone: bool = stone != null # (un oggetto già tolto dal gioco risulta "null")
+	var top_y := 99999.0
+	var last := Vector2.ZERO
+	while stone != null and is_instance_valid(stone):
+		top_y = minf(top_y, stone.global_position.y)
+		last = stone.global_position
+		await physics_frame
+	print("    pietra tirata in diagonale (mira %s): sale fino a y=%.0f, ricade a x=%.0f; la linea diceva x=%.0f" % [aim_now, top_y, last.x, predicted.x])
+	check(had_stone and aim_now.y < -0.5 and aim_now.x > 0.5 and top_y < GROUND - 150.0 and last.y > GROUND - 120.0, "la pietra sale e poi ricade (curva)")
+	check(absf(last.x - predicted.x) < 60.0, "la pietra cade dove mostrava la linea tratteggiata")
+
+	# Balestra: 40 di danno, poi ~1,2 s per ricaricare.
+	await _face_off(p0, p1, 450.0, CROSSBOW)
+	await tap("p0_attack")
+	await frames(20)
+	check(is_equal_approx(p1.health, 60.0), "la balestra tira dritto e toglie 40")
+	await tap("p0_attack")
+	await frames(20)
+	check(is_equal_approx(p1.health, 60.0) and p0.ammo == CROSSBOW.ammo - 1, "la balestra non tira mentre ricarica")
+	await frames(40)
+	await tap("p0_attack")
+	await frames(20)
+	check(is_equal_approx(p1.health, 20.0), "dopo ~1,2 s la balestra tira di nuovo")
+
+	# Il manichino sa usare le armi nuove.
+	main.toggle_dummy()
+	main.toggle_dummy()
+	main.toggle_dummy()
+	var dm = main.dummy
+	for w in [SWORD, SLING]:
+		main.start_round()
+		await frames(10)
+		main._spawn_timer = 999.0
+		p1.global_position = Vector2(2550, GROUND)
+		dm.global_position = Vector2(1100, GROUND)
+		p0.global_position = Vector2(700, GROUND)
+		dm.equip(w)
+		for i in 300:
+			await physics_frame
+			if p0.health < 100.0:
+				break
+		check(p0.health < 100.0, "il manichino attacca con: %s" % w.display_name)
+	main.remove_dummy()
+	main.start_round()
+
+
+## Le armi fisse dell'arena che sono ancora al loro posto.
+func _fixed_pickups() -> Array:
+	return get_nodes_in_group("pickups").filter(func(n): return n.fixed and not n.is_queued_for_deletion())
+
+
+## Livello 1 del bosco "Le radici": armi dell'arena, spada fissa, piattaforma centrale.
+func _test_radici() -> void:
+	var SWORD: WeaponData = load("res://src/weapons/wooden_sword.tres")
+	var SLING: WeaponData = load("res://src/weapons/sling.tres")
+	main.queue_free()
+	await frames(3)
+	main = load("res://src/core/main.tscn").instantiate()
+	main.fixed_arena = load("res://src/arenas/bosco/radici.tscn")
+	root.add_child(main)
+	await frames(2)
+	main.auto_weapons = false
+	var a = main.add_player("kb_b", -1, "kb_b")
+	var b = main.add_player("joy", 0, "joy_0")
+	await frames(60)
+	check(main.arena.arena_name == "Le radici" and a.is_on_floor() and b.is_on_floor(), "Le radici: si parte in piedi sulle radici")
+	check(main.ARENA_PATHS[0].ends_with("radici.tscn"), "Le radici e' la prima arena della partita")
+
+	# Dal cielo cadono solo fionde.
+	var only_slings := true
+	for i in 12:
+		var pk = main.spawn_weapon()
+		if pk.data != SLING:
+			only_slings = false
+		pk.queue_free()
+	await frames(2)
+	check(only_slings, "Le radici: dal cielo cadono solo fionde")
+
+	# La spada di legno è già sulla piattaforma centrale e non cade.
+	var fixed := _fixed_pickups()
+	check(fixed.size() == 1 and fixed[0].data == SWORD, "Le radici: c'e' la spada di legno fissa")
+	var sword_pos: Vector2 = fixed[0].global_position if fixed.size() == 1 else Vector2.ZERO
+	await frames(60)
+	check(fixed.size() == 1 and fixed[0].global_position.distance_to(sword_pos) < 1.0 and absf(sword_pos.x - 1600.0) < 5.0, "la spada fissa resta ferma al centro")
+
+	# Da terra la piattaforma centrale non si raggiunge (salto + doppio salto).
+	const CENTER_TOP := 900.0
+	a.global_position = Vector2(1300, 1548)
+	await frames(10)
+	var best := 99999.0
+	Input.action_press("p0_right")
+	Input.action_press("p0_jump")
+	for i in 22:
+		await physics_frame
+		best = minf(best, a.global_position.y)
+	Input.action_release("p0_jump")
+	await frames(2)
+	Input.action_press("p0_jump")
+	for i in 70:
+		await physics_frame
+		best = minf(best, a.global_position.y)
+	Input.action_release("p0_jump")
+	Input.action_release("p0_right")
+	print("    salto + doppio salto da terra: arriva a y=%.0f (la piattaforma centrale e' a %.0f)" % [best, CENTER_TOP])
+	check(best > CENTER_TOP + 60.0 and a.weapon == null, "da terra la piattaforma centrale non si raggiunge")
+
+	# Lasciandosi cadere dalla piattaforma lunga in cima ci si arriva, e si prende la spada.
+	a.respawn(Vector2(1100, 538))
+	await frames(10)
+	check(a.is_on_floor(), "si sta sulla piattaforma lunga in cima")
+	Input.action_press("p0_right")
+	for i in 120:
+		await physics_frame
+		if a.weapon != null:
+			break
+	Input.action_release("p0_right")
+	await frames(30)
+	check(a.weapon == SWORD and a.is_on_floor() and absf(a.global_position.y - CENTER_TOP) < 3.0, "cadendo dall'alto si atterra al centro e si prende la spada")
+	check(_fixed_pickups().is_empty(), "presa la spada, al centro non ce n'e' un'altra")
+
+	# Nuovo round: la spada torna al suo posto.
+	main.start_round()
+	await frames(3)
+	check(_fixed_pickups().size() == 1 and a.weapon == null, "nuovo round: la spada fissa torna al centro")

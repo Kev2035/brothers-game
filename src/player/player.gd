@@ -112,9 +112,14 @@ var bot: DummyBrain = null
 ## Arma in mano (null = mani nude: si tirano pugni).
 var weapon: WeaponData = null
 var ammo := 0
-var _fire_cd := 0.0
-var _fire_queued := 0.0
-var _muzzle_flash := 0.0
+# Stato dell'arma in mano: lo leggono e lo cambiano le schede delle armi (WeaponData.tick).
+var fire_cd := 0.0 ## tempo che manca al prossimo colpo
+var fire_queued := 0.0 ## un attacco premuto troppo presto parte appena possibile
+var muzzle_flash := 0.0
+var charge := -1.0 ## armi a carica: da 0 a 1 mentre carichi, -1 = non stai caricando
+var swing_t := -1.0 ## armi corpo a corpo: tempo dall'inizio del fendente (-1 = nessuno)
+var swing_dir := Vector2.RIGHT
+var aim_preview := PackedVector2Array() ## punti della linea tratteggiata (fionda)
 
 
 func _ready() -> void:
@@ -255,12 +260,11 @@ func _physics_process(delta: float) -> void:
 
 	# Attacco. O scudo o attacco: con lo scudo alzato non si colpisce.
 	if weapon != null:
-		# Con un'arma: le automatiche sparano tenendo premuto, le altre a ogni pressione.
-		if not stunned and not is_shielding() and _just("attack"):
-			_fire_queued = punch_buffer
-		var wants := _held("attack") if weapon.automatic else _fire_queued > 0.0
-		if wants and _fire_cd <= 0.0 and not stunned and not is_shielding():
-			_shoot()
+		# Con un'arma: cosa succede lo decide la scheda dell'arma (sparo, fendente, carica...).
+		var can_act := not stunned and not is_shielding()
+		if can_act and _just("attack"):
+			fire_queued = punch_buffer
+		weapon.tick(self, delta, can_act)
 	else:
 		# A mani nude: pugni. Si può "martellare" il tasto, partono appena possibile.
 		if not stunned and not is_shielding() and _just("attack"):
@@ -329,9 +333,13 @@ func _tick_timers(delta: float) -> void:
 		if _shield_t > shield_duration:
 			_shield_t = -1.0
 	_shield_flash = maxf(_shield_flash - delta, 0.0)
-	_fire_cd -= delta
-	_fire_queued -= delta
-	_muzzle_flash = maxf(_muzzle_flash - delta, 0.0)
+	fire_cd -= delta
+	fire_queued -= delta
+	muzzle_flash = maxf(muzzle_flash - delta, 0.0)
+	if swing_t >= 0.0:
+		swing_t += delta
+		if swing_t > 0.6:
+			swing_t = -1.0
 	_flash = maxf(_flash - delta, 0.0)
 	_squash = move_toward(_squash, 0.0, delta * 6.0)
 	if _drop_timer > 0.0:
@@ -375,6 +383,12 @@ func _punch() -> void:
 	_punch_queued = 0.0
 	_punch_t = 0.0
 	_punch_dir = aim
+	melee_hit(punch_range, punch_cone_deg, punch_damage)
+
+
+## Colpo ravvicinato nella direzione di mira (pugno o arma corpo a corpo):
+## colpisce chi sta entro "reach" pixel e dentro il cono. Ritorna true se ha colpito.
+func melee_hit(reach: float, cone_deg: float, damage: float) -> bool:
 	var center := global_position + BODY
 	var hit_someone := false
 	for node in get_tree().get_nodes_in_group("players"):
@@ -382,16 +396,17 @@ func _punch() -> void:
 		if p == null or p == self or not p.alive:
 			continue
 		var d := (p.global_position + BODY) - center
-		var in_reach := d.length() < punch_range + BODY_RADIUS
-		var in_cone := absf(rad_to_deg(aim.angle_to(d))) < punch_cone_deg
+		var in_reach := d.length() < reach + BODY_RADIUS
+		var in_cone := absf(rad_to_deg(aim.angle_to(d))) < cone_deg
 		if in_reach and (in_cone or d.length() < BODY_RADIUS * 1.5):
-			if p.take_hit(aim, center, punch_damage, self):
+			if p.take_hit(aim, center, damage, self):
 				hit_someone = true
-	# Pugno verso il basso in aria che colpisce: rimbalzi sopra l'avversario.
+	# Colpo verso il basso in aria che va a segno: rimbalzi sopra l'avversario.
 	if hit_someone and aim.y > 0.6 and not is_on_floor():
 		velocity.y = -pogo_bounce
 		if pogo_refreshes_double_jump:
 			_air_jumps = max_air_jumps
+	return hit_someone
 
 
 ## Chiamato da chi ti colpisce. from_pos = da dove arriva il colpo.
@@ -441,14 +456,43 @@ func _die(cause: String) -> void:
 func equip(data: WeaponData, with_ammo := -1) -> void:
 	weapon = data
 	ammo = data.ammo if with_ammo < 0 else with_ammo
-	_fire_cd = 0.0
-	_fire_queued = 0.0
+	fire_cd = 0.0
+	fire_queued = 0.0
+	swing_t = -1.0
+	cancel_charge()
 	_punch_t = -1.0
 
 
 func drop_weapon() -> void:
 	weapon = null
 	ammo = 0
+	swing_t = -1.0
+	cancel_charge()
+
+
+## Interrompe la carica (fionda) senza tirare.
+func cancel_charge() -> void:
+	charge = -1.0
+	aim_preview = PackedVector2Array()
+
+
+## Consuma un colpo dell'arma in mano; finiti i colpi, l'arma sparisce.
+## Le armi con "ammo = 0" nella scheda hanno colpi infiniti.
+func use_ammo() -> void:
+	if weapon == null or weapon.ammo <= 0:
+		return
+	ammo -= 1
+	if ammo <= 0:
+		drop_weapon()
+
+
+func attack_held() -> bool:
+	return _held("attack")
+
+
+## Punto da cui esce il colpo (la punta dell'arma).
+func muzzle_position() -> Vector2:
+	return grip_position() + aim * weapon.length
 
 
 ## Lascia cadere l'arma in mano: cade dov'è e resta lì con i colpi rimasti,
@@ -472,34 +516,6 @@ func grip_position() -> Vector2:
 	return global_position + BODY + aim * 30.0
 
 
-## Spara un colpo dell'arma in mano: proiettili, rinculo su chi spara, munizioni.
-func _shoot() -> void:
-	_fire_cd = weapon.fire_interval
-	_fire_queued = 0.0
-	_muzzle_flash = 0.06
-	var muzzle := grip_position() + aim * weapon.length
-	for i in weapon.pellets:
-		var spread := deg_to_rad(randf_range(-weapon.spread_deg, weapon.spread_deg) / 2.0)
-		var b := Bullet.new()
-		b.velocity = aim.rotated(spread) * weapon.bullet_speed * randf_range(0.95, 1.05)
-		b.damage = weapon.damage
-		b.shooter = self
-		b.max_distance = weapon.bullet_range
-		b.color = weapon.bullet_color
-		b.global_position = muzzle
-		get_parent().add_child(b)
-	# Rinculo: spinge chi spara nella direzione opposta alla mira.
-	var push := weapon.recoil * (1.0 if is_on_floor() else weapon.recoil_air_mult)
-	# Sparando verso il basso mentre cadi, prima si ferma la caduta: così il
-	# "salto col rinculo" è sempre uguale, qualunque sia la velocità di caduta.
-	if aim.y > 0.5 and velocity.y > 0.0:
-		velocity.y = 0.0
-	velocity -= aim * push
-	ammo -= 1
-	if ammo <= 0:
-		drop_weapon() # caricatore finito: l'arma sparisce
-
-
 func respawn(at: Vector2) -> void:
 	global_position = at
 	velocity = Vector2.ZERO
@@ -508,8 +524,7 @@ func respawn(at: Vector2) -> void:
 	_punch_t = -1.0
 	_shield_t = -1.0
 	_wall_lock = 0.0
-	weapon = null
-	ammo = 0
+	drop_weapon()
 	health = max_health
 	last_attacker = null
 	_last_attacker_timer = 0.0
@@ -590,13 +605,20 @@ func _draw() -> void:
 		# Arma in mano: si disegna dall'impugnatura verso la mira.
 		var grip := body + aim * 30.0
 		var squashed := shake + Vector2(grip.x * sx, grip.y * sy)
-		WeaponDraw.draw_weapon(self, squashed, aim, weapon)
+		var wdir := weapon.held_direction(self) # col fendente l'arma ruota
+		WeaponDraw.draw_weapon(self, squashed, wdir, weapon, weapon.held_side(self), weapon.is_ready(self))
 		draw_set_transform(shake, 0.0, Vector2(sx, sy))
-		if _muzzle_flash > 0.0:
+		if muzzle_flash > 0.0:
 			draw_circle(grip + aim * (weapon.length + 10.0), 14.0, Color(1, 0.9, 0.5, 0.9))
+		# Fendente: una scia bianca fa vedere fin dove arriva il colpo.
+		var melee := weapon as MeleeData
+		if melee != null and swing_t >= 0.0 and swing_t < 0.1:
+			var half_cone := deg_to_rad(melee.cone_deg)
+			var sa := swing_dir.angle()
+			draw_arc(body, melee.reach, sa - half_cone, sa + half_cone, 24, Color(1, 1, 1, 0.8 * (1.0 - swing_t / 0.1)), 10.0, true)
 		_ball(grip, 9.0, col)
 		if weapon.family == WeaponData.Family.TWO_HAND:
-			_ball(grip + aim * weapon.length * 0.6, 9.0, col)
+			_ball(grip + wdir * weapon.length * 0.45, 9.0, col)
 
 	# Scudo: arco davanti al personaggio che si chiude col passare del tempo.
 	if is_shielding():
@@ -606,6 +628,10 @@ func _draw() -> void:
 		draw_arc(body, shield_radius, a - half, a + half, 32, sc, 8.0, true)
 
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	# Linea tratteggiata della traiettoria mentre si carica la fionda.
+	for i in range(0, aim_preview.size() - 1, 2):
+		var fade := 1.0 - float(i) / float(aim_preview.size())
+		draw_line(aim_preview[i], aim_preview[i + 1], Color(1, 1, 1, 0.25 + 0.6 * fade), 7.0, true)
 	# La vita non si mostra di proposito: non si sa mai qual è l'ultimo colpo.
 
 

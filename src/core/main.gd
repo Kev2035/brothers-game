@@ -27,12 +27,25 @@ const LOBBY_SCENE := preload("res://src/arenas/lobby/lobby.tscn")
 ## Si scrive solo il percorso: ogni arena viene caricata in background quando serve,
 ## così anche con tante arene il gioco parte subito e non si blocca.
 const ARENA_PATHS: Array[String] = [
+	"res://src/arenas/bosco/radici.tscn",
 	"res://src/arenas/test_arena/test_arena.tscn",
 	"res://src/arenas/torri/torri.tscn",
 	"res://src/arenas/ponti/ponti.tscn",
 ]
-## Le armi disponibili (le "schede" in src/weapons/). Per aggiungerne una: nuovo .tres e una riga qui.
+## Le armi "di base" (le "schede" in src/weapons/): cadono nelle arene che non
+## dicono quali armi vogliono. Ogni arena può scegliere le sue (vedi "sky_weapons" in arena.gd).
 const WEAPONS: Array[WeaponData] = [
+	preload("res://src/weapons/pistol.tres"),
+	preload("res://src/weapons/smg.tres"),
+	preload("res://src/weapons/shotgun.tres"),
+]
+## Tutte le armi, nell'ordine in cui le dà il tasto di prova F4.
+const TEST_WEAPONS: Array[WeaponData] = [
+	preload("res://src/weapons/sling.tres"),
+	preload("res://src/weapons/wooden_sword.tres"),
+	preload("res://src/weapons/knife.tres"),
+	preload("res://src/weapons/axe.tres"),
+	preload("res://src/weapons/crossbow.tres"),
 	preload("res://src/weapons/pistol.tres"),
 	preload("res://src/weapons/smg.tres"),
 	preload("res://src/weapons/shotgun.tres"),
@@ -62,6 +75,9 @@ const WIN_PHRASES: Array[String] = [
 @export var scroll_time := 1.2
 ## Spazio vuoto tra un'arena e la successiva durante lo scorrimento.
 @export var arena_gap := 400.0
+
+## Le arene della partita, nell'ordine in cui si giocano (si parte da ARENA_PATHS).
+var arena_paths: Array[String] = ARENA_PATHS.duplicate()
 
 @onready var hud: Label = $HUD/Label
 
@@ -208,7 +224,7 @@ func _update_player_limits() -> void:
 ## La prossima arena della partita: in ordine, oppure a caso senza ripetere subito la stessa.
 func _pick_next_arena() -> String:
 	if _queue.is_empty():
-		_queue = ARENA_PATHS.duplicate()
+		_queue = arena_paths.duplicate()
 		if random_order:
 			_queue.shuffle()
 			if _queue.size() > 1 and _queue[0] == _last_path:
@@ -510,6 +526,7 @@ func start_round() -> void:
 	for node in get_tree().get_nodes_in_group("round_temp"):
 		node.queue_free()
 	_spawn_timer = WEAPON_FIRST_DELAY
+	arena.place_fixed_weapons()
 	var spawns := arena.spawn_points()
 	for p in participants():
 		p.respawn(spawns[p.slot])
@@ -525,6 +542,8 @@ func _physics_process(delta: float) -> void:
 		return
 	if phase == Phase.LOBBY and not lobby_weapons:
 		return
+	if not arena.sky_weapons_enabled:
+		return
 	_spawn_timer -= delta
 	if _spawn_timer <= 0.0:
 		_spawn_timer = randf_range(WEAPON_INTERVAL.x, WEAPON_INTERVAL.y)
@@ -532,11 +551,12 @@ func _physics_process(delta: float) -> void:
 			spawn_weapon()
 
 
-## Fa cadere un'arma dal cielo (a caso, se non si dice quale) in un punto a caso dell'arena.
+## Fa cadere un'arma dal cielo in un punto a caso dell'arena. Se non si dice quale,
+## la sceglie a caso tra quelle previste dall'arena.
 func spawn_weapon(data: WeaponData = null, x := NAN) -> WeaponPickup:
 	var b := arena.world_bounds
 	var pickup := WeaponPickup.new()
-	pickup.data = data if data != null else WEAPONS.pick_random()
+	pickup.data = data if data != null else arena.pick_sky_weapon(WEAPONS)
 	pickup.death_y = arena.death_y
 	if is_nan(x):
 		x = randf_range(b.position.x + b.size.x * 0.12, b.end.x - b.size.x * 0.12)
@@ -545,10 +565,11 @@ func spawn_weapon(data: WeaponData = null, x := NAN) -> WeaponPickup:
 	return pickup
 
 
-## F4 (per le prove): dà a tutti la stessa arma, a turno pistola -> mitra -> pompa.
+## F4 (per le prove): dà a tutti la stessa arma; a ogni pressione si passa alla successiva
+## (fionda -> spada di legno -> coltello -> ascia -> balestra -> pistola -> mitra -> pompa).
 func give_weapon_to_all() -> void:
-	var data := WEAPONS[_give_index]
-	_give_index = (_give_index + 1) % WEAPONS.size()
+	var data := TEST_WEAPONS[_give_index]
+	_give_index = (_give_index + 1) % TEST_WEAPONS.size()
 	for p in participants():
 		if p.alive:
 			p.equip(data)
@@ -636,15 +657,17 @@ func _update_hud() -> void:
 		lines.append("PROVA ARENA: %s" % arena.arena_name)
 	else:
 		lines.append("PARTITA  -  arena %d di %d: %s" % [arenas_played + 1, arenas_per_lobby, arena.arena_name])
-	lines.append("PROTOTIPO 2c     Esc / Start = PAUSA     R / Select = nuovo round     F2 = manichino (premi ancora: cambia cosa fa)   F3 = togli manichino   F4 = arma a tutti")
+	lines.append("PROTOTIPO 3a (Bosco)     Esc / Start = PAUSA     R / Select = nuovo round     F2 = manichino (premi ancora: cambia cosa fa)   F3 = togli manichino   F4 = arma a tutti (premi ancora: cambia arma)")
 	if _free_slot() >= 0:
 		lines.append("Per entrare: W o Spazio (tastiera + mouse)  -  Freccia SU (tastiera frecce)  -  A sul joystick")
-	lines.append("Tastiera + mouse: A/D muovi, W/Spazio salta, S giu, mira col mouse, pugno o SPARO clic sinistro (o F), scudo clic destro (o E), lascia arma Q")
+	lines.append("Tastiera + mouse: A/D muovi, W/Spazio salta, S giu, mira col mouse, pugno o SPARO clic sinistro (o F; FIONDA: tieni premuto e lascia), scudo clic destro (o E), lascia arma Q")
 	lines.append("Tastiera frecce: frecce muovi e mira, Freccia su salta, pugno/sparo Invio, scudo Shift destro, lascia arma Ctrl destro  |  Joystick: levette muovi/mira, A salta, X/RB pugno/sparo, B/LB scudo, Y lascia arma")
 	for p in participants():
 		var label: String = names[p.slot]
 		if p == dummy:
 			label = "Manichino (%s)" % dummy.bot.mode_name()
-		var held := "mani nude" if p.weapon == null else "%s (%d colpi)" % [p.weapon.display_name, p.ammo]
+		var held := "mani nude"
+		if p.weapon != null: # le armi con colpi infiniti non mostrano il numero
+			held = p.weapon.display_name if p.weapon.ammo <= 0 else "%s (%d colpi)" % [p.weapon.display_name, p.ammo]
 		lines.append("%s:  vittorie %d  ·  eliminazioni %d  ·  cadute %d  ·  danni fatti %d  ·  %s" % [label, wins[p.slot], kills[p.slot], falls[p.slot], int(damage_dealt[p.slot]), held])
 	hud.text = "\n".join(lines)
