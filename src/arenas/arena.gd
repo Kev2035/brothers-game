@@ -4,6 +4,7 @@ extends Node2D
 ## Come in Stick Fight si può uscire un po' dallo schermo di lato e in alto,
 ## ma poi ci sono muri invisibili. Sotto invece c'è il vuoto: si muore.
 
+@export var arena_name := "Arena" ## nome che si vede in alto durante la partita
 @export var bounds := Rect2(0, 0, 3200, 1800) ## area che la telecamera inquadra
 @export var side_margin := 250.0 ## quanto si può uscire di lato prima del muro invisibile
 @export var top_margin := 450.0 ## quanto si può salire sopra lo schermo

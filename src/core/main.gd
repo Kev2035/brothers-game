@@ -1,10 +1,15 @@
 extends Node2D
-## Scena principale del prototipo (tappa 2a: vita, danni e round).
+## Scena principale e "gestore partita" (tappa 2c: lobby e partita infinita).
+## - Il gioco parte nella LOBBY: una piattaforma dove ci si può già picchiare.
+##   Chi muore ricompare subito e le statistiche non contano.
+## - Appena qualcuno fa fuori un avversario parte la PARTITA: le arene si
+##   susseguono, una per round (chi resta vivo vince il round).
+## - Dopo `arenas_per_lobby` arene si torna alla lobby, che mostra la classifica.
 ## - Un giocatore entra premendo il suo tasto di salto (fino a 4 posti).
 ## - F2 aggiunge il manichino d'allenamento / cambia cosa fa; F3 lo toglie.
-## - Con almeno 2 partecipanti si gioca a round: chi resta vivo vince il round,
-##   poi tutti ricompaiono con la vita piena. Da soli si ricompare subito.
 ## - R (tastiera) o Start (joystick) fa ripartire il round.
+
+enum Phase { LOBBY, MATCH }
 
 const PLAYER_SCENE := preload("res://src/player/player.tscn")
 const MAX_PLAYERS := 4
@@ -13,6 +18,14 @@ const COLOR_NAMES: Array[String] = ["Rosso", "Blu", "Verde", "Giallo"]
 const DUMMY_COLOR := Color("9a9aa6")
 const RESPAWN_DELAY := 1.0
 const ROUND_END_DELAY := 2.5
+const MATCH_START_DELAY := 1.5 ## secondi tra la prima eliminazione nella lobby e la prima arena
+const LOBBY_SCENE := preload("res://src/arenas/lobby/lobby.tscn")
+## Le arene della partita. Per aggiungerne una: nuova scena in src/arenas/ e una riga qui.
+const ARENA_SCENES: Array[PackedScene] = [
+	preload("res://src/arenas/test_arena/test_arena.tscn"),
+	preload("res://src/arenas/torri/torri.tscn"),
+	preload("res://src/arenas/ponti/ponti.tscn"),
+]
 ## Le armi disponibili (le "schede" in src/weapons/). Per aggiungerne una: nuovo .tres e una riga qui.
 const WEAPONS: Array[WeaponData] = [
 	preload("res://src/weapons/pistol.tres"),
@@ -30,8 +43,27 @@ const WIN_PHRASES: Array[String] = [
 	"TOO GOOD", "LET'S GOOO", "BUILT DIFFERENT", "CALCULATED",
 ]
 
-@onready var arena: Arena = $TestArena
+## Quante arene si giocano prima di tornare alla lobby con la classifica.
+## Per le prove è 3; nel gioco vero sarà circa 20.
+@export var arenas_per_lobby := 3
+## false = arene sempre nello stesso ordine; true = a caso (in futuro si sceglierà dal menu).
+@export var random_order := false
+## true = anche nella lobby cadono le armi dal cielo.
+@export var lobby_weapons := false
+## Se scegli qui un'arena, si gioca solo su quella, senza lobby e senza cambi:
+## comodo per provare un'arena nuova (lo usa anche il test automatico).
+@export var fixed_arena: PackedScene
+
 @onready var hud: Label = $HUD/Label
+
+var arena: Arena
+var phase := Phase.LOBBY
+var arenas_played := 0 ## arene finite in questo giro (dall'ultima volta nella lobby)
+var total_arenas := 0 ## arene finite in tutta la partita
+var _match_starting := false
+var _queue: Array[PackedScene] = [] ## prossime arene in coda
+var _last_scene: PackedScene
+var scoreboard: Scoreboard
 
 ## Un posto per giocatore (null = posto libero). L'indice è lo "slot".
 var players: Array = [null, null, null, null]
@@ -60,7 +92,6 @@ func _ready() -> void:
 	camera = Camera2D.new()
 	add_child(camera)
 	camera.make_current()
-	frame_arena(arena)
 	_banner = Label.new()
 	_banner.position = Vector2(0, 400)
 	_banner.size = Vector2(1920, 160)
@@ -70,7 +101,94 @@ func _ready() -> void:
 	_banner.add_theme_color_override("font_outline_color", Color("1b1b2b"))
 	_banner.visible = false
 	$HUD.add_child(_banner)
-	_update_hud()
+	scoreboard = Scoreboard.new()
+	$HUD.add_child(scoreboard)
+	if fixed_arena != null:
+		phase = Phase.MATCH
+		load_arena(fixed_arena)
+	else:
+		phase = Phase.LOBBY
+		load_arena(LOBBY_SCENE)
+
+
+## Toglie l'arena attuale e mette quella nuova; tutti ricompaiono ai punti di partenza.
+func load_arena(scene: PackedScene) -> void:
+	if arena != null:
+		remove_child(arena)
+		arena.queue_free()
+	arena = scene.instantiate()
+	add_child(arena)
+	move_child(arena, 0) # dietro ai personaggi
+	frame_arena(arena)
+	for p in participants():
+		p.death_y = arena.death_y
+		p.side_limits = arena.side_limits
+	start_round()
+
+
+## La prossima arena della partita: in ordine, oppure a caso senza ripetere subito la stessa.
+func _pick_next_arena() -> PackedScene:
+	if _queue.is_empty():
+		_queue = ARENA_SCENES.duplicate()
+		if random_order:
+			_queue.shuffle()
+			if _queue.size() > 1 and _queue[0] == _last_scene:
+				_queue.reverse()
+	_last_scene = _queue.pop_front()
+	return _last_scene
+
+
+## Prima eliminazione nella lobby: si parte!
+func _begin_match() -> void:
+	_match_starting = true
+	_show_banner("FIGHT!", Color.WHITE)
+	await get_tree().create_timer(MATCH_START_DELAY).timeout
+	if phase != Phase.LOBBY or not _match_starting:
+		return
+	_match_starting = false
+	phase = Phase.MATCH
+	arenas_played = 0
+	scoreboard.visible = false
+	load_arena(_pick_next_arena())
+
+
+## Fine di un round della partita: arena successiva, o ritorno alla lobby.
+func _after_round() -> void:
+	arenas_played += 1
+	total_arenas += 1
+	if fixed_arena != null:
+		start_round()
+	elif arenas_played >= arenas_per_lobby:
+		go_to_lobby()
+	else:
+		load_arena(_pick_next_arena())
+
+
+func go_to_lobby() -> void:
+	phase = Phase.LOBBY
+	_match_starting = false
+	load_arena(LOBBY_SCENE)
+	if total_arenas > 0:
+		scoreboard.show_table("CLASSIFICA  -  %d arene giocate" % total_arenas, _score_rows())
+
+
+func _score_rows() -> Array:
+	var rows := []
+	for p in participants():
+		rows.append({"name": _short_name(p), "color": p.color, "wins": wins[p.slot],
+			"kills": kills[p.slot], "falls": falls[p.slot], "damage": damage_dealt[p.slot]})
+	return rows
+
+
+## Le statistiche contano solo durante la partita, non nella lobby.
+func counting_stats() -> bool:
+	return phase == Phase.MATCH
+
+
+func _show_banner(text: String, color: Color) -> void:
+	_banner.text = text
+	_banner.add_theme_color_override("font_color", color)
+	_banner.visible = true
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -188,7 +306,10 @@ func remove_dummy() -> void:
 	players[dummy.slot] = null
 	dummy.queue_free()
 	dummy = null
-	start_round()
+	if phase == Phase.MATCH and fixed_arena == null and participants().size() <= 1:
+		go_to_lobby() # da soli non si fa una partita
+	else:
+		start_round()
 
 
 ## Nuovo round: tutti ricompaiono al loro punto di partenza con la vita piena.
@@ -212,6 +333,8 @@ func _physics_process(delta: float) -> void:
 		_hud_timer = 0.2
 		_update_hud() # tiene aggiornate le munizioni nella scritta
 	if round_over or participants().is_empty() or not auto_weapons:
+		return
+	if phase == Phase.LOBBY and not lobby_weapons:
 		return
 	_spawn_timer -= delta
 	if _spawn_timer <= 0.0:
@@ -244,24 +367,29 @@ func give_weapon_to_all() -> void:
 
 
 func _on_player_damaged(_victim: Player, attacker: Player, amount: float) -> void:
-	if attacker != null and is_instance_valid(attacker):
+	if attacker != null and is_instance_valid(attacker) and counting_stats():
 		damage_dealt[attacker.slot] += amount
 
 
 func _on_player_died(p: Player, cause: String) -> void:
 	_spawn_puff(p.global_position, p.color)
-	if cause == "fall":
-		falls[p.slot] += 1
 	var killer := p.last_attacker
-	if killer != null and is_instance_valid(killer) and killer != p:
-		kills[killer.slot] += 1
+	var by_enemy := killer != null and is_instance_valid(killer) and killer != p
+	if counting_stats():
+		if cause == "fall":
+			falls[p.slot] += 1
+		if by_enemy:
+			kills[killer.slot] += 1
 	_update_hud()
 
 	var everyone := participants()
-	if everyone.size() <= 1:
-		# Da soli non ci sono round: si ricompare dopo un attimo.
+	if phase == Phase.LOBBY or everyone.size() <= 1:
+		# Nella lobby (o da soli) non ci sono round: si ricompare dopo un attimo.
+		if phase == Phase.LOBBY and by_enemy and not _match_starting:
+			_begin_match()
+		var where := arena
 		await get_tree().create_timer(RESPAWN_DELAY).timeout
-		if is_instance_valid(p) and not p.alive:
+		if is_instance_valid(p) and not p.alive and arena == where:
 			p.respawn(arena.spawn_points()[p.slot])
 		return
 
@@ -278,17 +406,14 @@ func _on_player_died(p: Player, cause: String) -> void:
 	if alive.size() == 1:
 		var winner := alive[0]
 		wins[winner.slot] += 1
-		_banner.text = WIN_PHRASES.pick_random()
-		_banner.add_theme_color_override("font_color", winner.color)
+		_show_banner(WIN_PHRASES.pick_random(), winner.color)
 	else:
-		_banner.text = "PAREGGIO!"
-		_banner.add_theme_color_override("font_color", Color.WHITE)
-	_banner.visible = true
+		_show_banner("PAREGGIO!", Color.WHITE)
 	_update_hud()
 	var this_round := _round_id
 	await get_tree().create_timer(ROUND_END_DELAY).timeout
 	if round_over and this_round == _round_id:
-		start_round()
+		_after_round()
 
 
 ## Sbuffo di fumo del colore del personaggio quando muore.
@@ -316,7 +441,13 @@ func _describe(kind: String, device: int) -> String:
 
 func _update_hud() -> void:
 	var lines: Array[String] = []
-	lines.append("PROTOTIPO 2b - ARMI     R / Start = nuovo round     F2 = manichino (premi ancora: cambia cosa fa)   F3 = togli manichino   F4 = arma a tutti")
+	if phase == Phase.LOBBY:
+		lines.append("LOBBY  -  fai fuori un avversario per iniziare la partita")
+	elif fixed_arena != null:
+		lines.append("PROVA ARENA: %s" % arena.arena_name)
+	else:
+		lines.append("PARTITA  -  arena %d di %d: %s" % [arenas_played + 1, arenas_per_lobby, arena.arena_name])
+	lines.append("PROTOTIPO 2c - PARTITA     R / Start = nuovo round     F2 = manichino (premi ancora: cambia cosa fa)   F3 = togli manichino   F4 = arma a tutti")
 	if _free_slot() >= 0:
 		lines.append("Per entrare: W o Spazio (tastiera + mouse)  -  Freccia SU (tastiera frecce)  -  A sul joystick")
 	lines.append("Tastiera + mouse: A/D muovi, W/Spazio salta, S giu, mira col mouse, pugno o SPARO clic sinistro (o F), scudo clic destro (o E), lascia arma Q")

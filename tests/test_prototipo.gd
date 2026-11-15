@@ -44,6 +44,7 @@ func tap(action: String, hold := 2) -> void:
 
 func _run() -> void:
 	main = load("res://src/core/main.tscn").instantiate()
+	main.fixed_arena = load("res://src/arenas/test_arena/test_arena.tscn") # niente lobby: solo l'arena di prova
 	root.add_child(main)
 	await frames(2)
 
@@ -530,5 +531,98 @@ func _run() -> void:
 	check(p0.weapon != null, "allontanandosi e tornando l'arma lasciata si riprende")
 	main.start_round()
 
+	await _test_lobby_e_partita()
+
 	print("Risultati: %d ok, %d falliti" % [passed, failed])
 	quit(1 if failed > 0 else 0)
+
+
+## Elimina `victim` a pugni (lo rimette ogni volta davanti a `attacker`, sul pavimento `floor_y`).
+func _punch_out(attacker, victim, x: float, floor_y: float) -> int:
+	var n := 0
+	while victim.alive and n < 20:
+		attacker.global_position = Vector2(x, floor_y)
+		victim.global_position = Vector2(x + 80.0, floor_y)
+		attacker.facing = 1.0
+		await frames(1)
+		await tap("p0_attack")
+		await frames(12)
+		n += 1
+	return n
+
+
+func _test_lobby_e_partita() -> void:
+	# Nuova partita "vera": parte dalla lobby.
+	main.queue_free()
+	await frames(3)
+	main = load("res://src/core/main.tscn").instantiate()
+	main.arenas_per_lobby = 2
+	root.add_child(main)
+	await frames(2)
+	check(main.phase == main.Phase.LOBBY and main.arena.arena_name == "Lobby", "il gioco parte nella lobby")
+	var a = main.add_player("kb_b", -1, "kb_b")
+	var b = main.add_player("joy", 0, "joy_0")
+	await frames(40)
+	check(a.is_on_floor() and b.is_on_floor(), "nella lobby si sta sulla piattaforma")
+	const LOBBY_FLOOR := 1098.0
+
+	# Cadere da soli nella lobby: si ricompare, la partita non parte, non conta.
+	b.global_position = Vector2(250, 1300)
+	b.velocity = Vector2.ZERO
+	for i in 90:
+		await physics_frame
+		if not b.alive:
+			break
+	check(not b.alive and not main._match_starting and main.falls[1] == 0, "nella lobby cadere da soli non fa partire la partita e non conta")
+	await create_timer(1.2).timeout
+	check(b.alive, "nella lobby si ricompare subito")
+
+	# Prima eliminazione nella lobby: parte la partita.
+	await _punch_out(a, b, 1000.0, LOBBY_FLOOR)
+	check(not b.alive and main._match_starting, "fare fuori qualcuno nella lobby fa partire la partita")
+	check(main.kills[0] == 0 and main.damage_dealt[0] == 0.0, "nella lobby le statistiche non contano")
+	await create_timer(1.8).timeout
+	check(main.phase == main.Phase.MATCH and main.arena.arena_name == "Arena di prova", "prima arena: %s" % main.arena.arena_name)
+	check(a.alive and b.alive and a.is_inside_tree(), "nella nuova arena ricompaiono tutti")
+	check(a.death_y == main.arena.death_y, "i personaggi conoscono il vuoto della nuova arena")
+
+	# Round 1: B cade nel pozzo -> A vince -> arena successiva.
+	await frames(20)
+	b.global_position = Vector2(PIT_X, 1500)
+	b.velocity = Vector2.ZERO
+	await frames(90)
+	check(main.wins[0] == 1 and main.falls[1] == 1, "in partita le statistiche contano")
+	await create_timer(2.8).timeout
+	check(main.arena.arena_name == "Torri" and main.arenas_played == 1, "dopo il round si passa all'arena dopo: %s" % main.arena.arena_name)
+	var spawns: Array[Vector2] = main.arena.spawn_points()
+	check(a.global_position.distance_to(spawns[0]) < 60.0, "si riparte dai punti di partenza della nuova arena")
+
+	# Round 2: B cade tra le isole -> torna la lobby con la classifica.
+	await frames(20)
+	b.global_position = Vector2(1100, 1500)
+	b.velocity = Vector2.ZERO
+	await frames(90)
+	await create_timer(2.8).timeout
+	check(main.phase == main.Phase.LOBBY and main.arena.arena_name == "Lobby", "dopo %d arene si torna alla lobby" % main.arenas_per_lobby)
+	check(main.scoreboard.visible and main.total_arenas == 2, "la lobby mostra la classifica")
+	check(main.wins[0] == 2, "le statistiche restano per tutta la partita (vittorie A: %d)" % main.wins[0])
+
+	# Si riparte: l'ordine continua con la terza arena.
+	await frames(30)
+	await _punch_out(a, b, 1000.0, LOBBY_FLOOR)
+	await create_timer(1.8).timeout
+	check(main.arena.arena_name == "Ponti" and not main.scoreboard.visible, "nuovo giro: si continua con l'arena dopo (%s)" % main.arena.arena_name)
+
+	# Ordine a caso: mai la stessa arena due volte di fila, e prima o poi escono tutte.
+	main.random_order = true
+	main._queue.clear()
+	var seen := {}
+	var repeats := 0
+	var prev = null
+	for i in 40:
+		var sc = main._pick_next_arena()
+		if sc == prev:
+			repeats += 1
+		prev = sc
+		seen[sc] = true
+	check(repeats == 0 and seen.size() == main.ARENA_SCENES.size(), "ordine a caso: escono tutte e mai due uguali di fila")
