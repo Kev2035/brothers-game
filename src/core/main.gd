@@ -5,6 +5,8 @@ extends Node2D
 ## - Appena qualcuno fa fuori un avversario parte la PARTITA: le arene si
 ##   susseguono, una per round (chi resta vivo vince il round).
 ## - Dopo `arenas_per_lobby` arene si torna alla lobby, che mostra la classifica.
+## - Cambio di arena "a scorrimento": la nuova arena compare accanto a quella
+##   vecchia, i personaggi spariscono e la telecamera scorre fino a lì.
 ## - Un giocatore entra premendo il suo tasto di salto (fino a 4 posti).
 ## - F2 aggiunge il manichino d'allenamento / cambia cosa fa; F3 lo toglie.
 ## - R (tastiera) o Start (joystick) fa ripartire il round.
@@ -21,10 +23,12 @@ const ROUND_END_DELAY := 2.5
 const MATCH_START_DELAY := 1.5 ## secondi tra la prima eliminazione nella lobby e la prima arena
 const LOBBY_SCENE := preload("res://src/arenas/lobby/lobby.tscn")
 ## Le arene della partita. Per aggiungerne una: nuova scena in src/arenas/ e una riga qui.
-const ARENA_SCENES: Array[PackedScene] = [
-	preload("res://src/arenas/test_arena/test_arena.tscn"),
-	preload("res://src/arenas/torri/torri.tscn"),
-	preload("res://src/arenas/ponti/ponti.tscn"),
+## Si scrive solo il percorso: ogni arena viene caricata in background quando serve,
+## così anche con tante arene il gioco parte subito e non si blocca.
+const ARENA_PATHS: Array[String] = [
+	"res://src/arenas/test_arena/test_arena.tscn",
+	"res://src/arenas/torri/torri.tscn",
+	"res://src/arenas/ponti/ponti.tscn",
 ]
 ## Le armi disponibili (le "schede" in src/weapons/). Per aggiungerne una: nuovo .tres e una riga qui.
 const WEAPONS: Array[WeaponData] = [
@@ -53,6 +57,10 @@ const WIN_PHRASES: Array[String] = [
 ## Se scegli qui un'arena, si gioca solo su quella, senza lobby e senza cambi:
 ## comodo per provare un'arena nuova (lo usa anche il test automatico).
 @export var fixed_arena: PackedScene
+## Quanti secondi dura lo scorrimento della telecamera da un'arena all'altra.
+@export var scroll_time := 1.2
+## Spazio vuoto tra un'arena e la successiva durante lo scorrimento.
+@export var arena_gap := 400.0
 
 @onready var hud: Label = $HUD/Label
 
@@ -61,8 +69,10 @@ var phase := Phase.LOBBY
 var arenas_played := 0 ## arene finite in questo giro (dall'ultima volta nella lobby)
 var total_arenas := 0 ## arene finite in tutta la partita
 var _match_starting := false
-var _queue: Array[PackedScene] = [] ## prossime arene in coda
-var _last_scene: PackedScene
+var transitioning := false ## true mentre la telecamera scorre verso la nuova arena
+var _queue: Array[String] = [] ## prossime arene in coda (percorsi)
+var _last_path := ""
+var _next_path := "" ## la prossima arena, già in caricamento in background
 var scoreboard: Scoreboard
 
 ## Un posto per giocatore (null = posto libero). L'indice è lo "slot".
@@ -109,9 +119,11 @@ func _ready() -> void:
 	else:
 		phase = Phase.LOBBY
 		load_arena(LOBBY_SCENE)
+		_prepare_next_arena()
 
 
-## Toglie l'arena attuale e mette quella nuova; tutti ricompaiono ai punti di partenza.
+## Toglie l'arena attuale e mette subito quella nuova (senza scorrimento);
+## tutti ricompaiono ai punti di partenza.
 func load_arena(scene: PackedScene) -> void:
 	if arena != null:
 		remove_child(arena)
@@ -120,22 +132,96 @@ func load_arena(scene: PackedScene) -> void:
 	add_child(arena)
 	move_child(arena, 0) # dietro ai personaggi
 	frame_arena(arena)
-	for p in participants():
-		p.death_y = arena.death_y
-		p.side_limits = arena.side_limits
+	_update_player_limits()
 	start_round()
 
 
+## Cambio di arena "a scorrimento" (come in Stick Fight):
+## 1. la nuova arena compare a destra di quella vecchia e i personaggi spariscono;
+## 2. la telecamera scorre fino alla nuova arena;
+## 3. l'arena vecchia si toglie e tutti ricompaiono ai punti di partenza.
+func scroll_to_arena(scene: PackedScene) -> void:
+	if transitioning:
+		return
+	transitioning = true
+	round_over = true # niente armi e niente fine round durante lo scorrimento
+	_round_id += 1
+	_banner.visible = false
+	for node in get_tree().get_nodes_in_group("round_temp"):
+		node.queue_free()
+	for p in participants():
+		_hide_player(p)
+
+	var old := arena
+	var next_arena: Arena = scene.instantiate()
+	add_child(next_arena)
+	move_child(next_arena, 0)
+	var ob := old.world_bounds
+	next_arena.position = Vector2(ob.end.x + arena_gap - next_arena.bounds.position.x, old.position.y)
+	# I due sfondi si incontrano a metà dello spazio vuoto tra le arene.
+	var border_x := ob.end.x + arena_gap / 2.0
+	old.clip_background(-INF, border_x)
+	next_arena.clip_background(border_x, INF)
+
+	var tw := create_tween().set_parallel().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(camera, "position", next_arena.world_bounds.get_center(), scroll_time)
+	tw.tween_property(camera, "zoom", _zoom_for(next_arena), scroll_time)
+	await tw.finished
+
+	# Via l'arena vecchia. Quella nuova torna al punto (0, 0) insieme alla telecamera:
+	# lo spostamento non si vede, e le posizioni restano sempre numeri piccoli.
+	remove_child(old)
+	old.queue_free()
+	next_arena.position = Vector2.ZERO
+	next_arena.clip_background() # di nuovo lo sfondo intero
+	arena = next_arena
+	frame_arena(arena)
+	_update_player_limits()
+	transitioning = false
+	start_round()
+	if phase == Phase.MATCH and fixed_arena == null and participants().size() <= 1:
+		go_to_lobby() # nel frattempo è rimasto un solo giocatore
+
+
+## Il personaggio sparisce durante lo scorrimento (ricompare con respawn).
+func _hide_player(p: Player) -> void:
+	p.visible = false
+	p.velocity = Vector2.ZERO
+	p.set_physics_process(false)
+
+
+func _update_player_limits() -> void:
+	for p in participants():
+		p.death_y = arena.death_y
+		p.side_limits = arena.side_limits
+
+
 ## La prossima arena della partita: in ordine, oppure a caso senza ripetere subito la stessa.
-func _pick_next_arena() -> PackedScene:
+func _pick_next_arena() -> String:
 	if _queue.is_empty():
-		_queue = ARENA_SCENES.duplicate()
+		_queue = ARENA_PATHS.duplicate()
 		if random_order:
 			_queue.shuffle()
-			if _queue.size() > 1 and _queue[0] == _last_scene:
+			if _queue.size() > 1 and _queue[0] == _last_path:
 				_queue.reverse()
-	_last_scene = _queue.pop_front()
-	return _last_scene
+	_last_path = _queue.pop_front()
+	return _last_path
+
+
+## Sceglie la prossima arena e comincia a caricarla in background, mentre si gioca.
+func _prepare_next_arena() -> void:
+	if _next_path != "" or fixed_arena != null:
+		return
+	_next_path = _pick_next_arena()
+	ResourceLoader.load_threaded_request(_next_path)
+
+
+## Prende la prossima arena (se il caricamento non ha ancora finito, aspetta qui).
+func _take_next_arena() -> PackedScene:
+	_prepare_next_arena()
+	var path := _next_path
+	_next_path = ""
+	return ResourceLoader.load_threaded_get(path)
 
 
 ## Prima eliminazione nella lobby: si parte!
@@ -149,7 +235,8 @@ func _begin_match() -> void:
 	phase = Phase.MATCH
 	arenas_played = 0
 	scoreboard.visible = false
-	load_arena(_pick_next_arena())
+	await scroll_to_arena(_take_next_arena())
+	_prepare_next_arena()
 
 
 ## Fine di un round della partita: arena successiva, o ritorno alla lobby.
@@ -161,14 +248,18 @@ func _after_round() -> void:
 	elif arenas_played >= arenas_per_lobby:
 		go_to_lobby()
 	else:
-		load_arena(_pick_next_arena())
+		await scroll_to_arena(_take_next_arena())
+		_prepare_next_arena()
 
 
 func go_to_lobby() -> void:
+	if transitioning:
+		return
 	phase = Phase.LOBBY
 	_match_starting = false
-	load_arena(LOBBY_SCENE)
-	if total_arenas > 0:
+	await scroll_to_arena(LOBBY_SCENE)
+	_prepare_next_arena()
+	if total_arenas > 0 and phase == Phase.LOBBY:
 		scoreboard.show_table("CLASSIFICA  -  %d arene giocate" % total_arenas, _score_rows())
 
 
@@ -230,11 +321,16 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func frame_arena(a: Arena) -> void:
+	camera.position = a.world_bounds.get_center()
+	camera.zoom = _zoom_for(a)
+
+
+## Lo zoom che fa stare tutta l'arena nello schermo.
+func _zoom_for(a: Arena) -> Vector2:
 	var view := Vector2(get_viewport().get_visible_rect().size)
 	if view.x <= 0.0:
 		view = Vector2(1920, 1080)
-	camera.position = a.bounds.get_center()
-	camera.zoom = Vector2.ONE * minf(view.x / a.bounds.size.x, view.y / a.bounds.size.y)
+	return Vector2.ONE * minf(view.x / a.bounds.size.x, view.y / a.bounds.size.y)
 
 
 func _free_slot() -> int:
@@ -260,6 +356,8 @@ func _spawn(slot: int, color: Color) -> Player:
 	p.side_limits = arena.side_limits
 	add_child(p)
 	p.respawn(arena.spawn_points()[slot])
+	if transitioning:
+		_hide_player(p) # entra durante lo scorrimento: compare nella nuova arena
 	p.died.connect(_on_player_died)
 	p.damaged.connect(_on_player_damaged)
 	players[slot] = p
@@ -314,6 +412,8 @@ func remove_dummy() -> void:
 
 ## Nuovo round: tutti ricompaiono al loro punto di partenza con la vita piena.
 func start_round() -> void:
+	if transitioning:
+		return
 	_round_id += 1
 	round_over = false
 	_banner.visible = false
@@ -345,7 +445,7 @@ func _physics_process(delta: float) -> void:
 
 ## Fa cadere un'arma dal cielo (a caso, se non si dice quale) in un punto a caso dell'arena.
 func spawn_weapon(data: WeaponData = null, x := NAN) -> WeaponPickup:
-	var b := arena.bounds
+	var b := arena.world_bounds
 	var pickup := WeaponPickup.new()
 	pickup.data = data if data != null else WEAPONS.pick_random()
 	pickup.death_y = arena.death_y
@@ -389,7 +489,7 @@ func _on_player_died(p: Player, cause: String) -> void:
 			_begin_match()
 		var where := arena
 		await get_tree().create_timer(RESPAWN_DELAY).timeout
-		if is_instance_valid(p) and not p.alive and arena == where:
+		if is_instance_valid(p) and not p.alive and arena == where and not transitioning:
 			p.respawn(arena.spawn_points()[p.slot])
 		return
 
@@ -418,7 +518,7 @@ func _on_player_died(p: Player, cause: String) -> void:
 
 ## Sbuffo di fumo del colore del personaggio quando muore.
 func _spawn_puff(pos: Vector2, color: Color) -> void:
-	var b := arena.bounds
+	var b := arena.world_bounds
 	Fx.puff(self, Vector2(clampf(pos.x, b.position.x + 40.0, b.end.x - 40.0), minf(pos.y - 50.0, b.end.y - 60.0)), color)
 
 

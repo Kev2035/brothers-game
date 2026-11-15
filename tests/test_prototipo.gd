@@ -551,6 +551,14 @@ func _punch_out(attacker, victim, x: float, floor_y: float) -> int:
 	return n
 
 
+## Aspetta (al massimo `timeout` secondi) che la condizione diventi vera.
+func _wait_for(cond: Callable, timeout: float) -> void:
+	var t := 0.0
+	while not cond.call() and t < timeout:
+		await physics_frame
+		t += 1.0 / 60.0
+
+
 func _test_lobby_e_partita() -> void:
 	# Nuova partita "vera": parte dalla lobby.
 	main.queue_free()
@@ -581,7 +589,32 @@ func _test_lobby_e_partita() -> void:
 	await _punch_out(a, b, 1000.0, LOBBY_FLOOR)
 	check(not b.alive and main._match_starting, "fare fuori qualcuno nella lobby fa partire la partita")
 	check(main.kills[0] == 0 and main.damage_dealt[0] == 0.0, "nella lobby le statistiche non contano")
-	await create_timer(1.8).timeout
+	# Scorrimento: la nuova arena compare a destra, i personaggi spariscono, la telecamera si muove.
+	await _wait_for(func(): return main.transitioning, 3.0)
+	await frames(10)
+	var arenas_now := 0
+	for c in main.get_children():
+		if c is Arena:
+			arenas_now += 1
+	var cam_x0: float = main.camera.position.x
+	check(arenas_now == 2 and not a.visible and not b.visible, "durante lo scorrimento ci sono due arene e i personaggi spariscono")
+	# Il confine tra i due sfondi deve stare nello spazio vuoto tra le arene.
+	var arenas_list: Array = main.get_children().filter(func(c): return c is Arena and c != main.arena)
+	if arenas_list.size() == 1:
+		var nxt: Arena = arenas_list[0]
+		var old_bg: Rect2 = (main.arena.get_node("Background") as Control).get_global_rect()
+		var new_bg := (nxt.get_node("Background") as Control).get_global_rect()
+		var gap_l: float = main.arena.world_bounds.end.x
+		var gap_r: float = nxt.world_bounds.position.x
+		check(old_bg.end.x >= gap_l and old_bg.end.x <= gap_r and is_equal_approx(old_bg.end.x, new_bg.position.x),
+			"il confine tra gli sfondi sta nello spazio vuoto tra le arene (%.0f tra %.0f e %.0f)" % [old_bg.end.x, gap_l, gap_r])
+	else:
+		check(false, "durante lo scorrimento trovo l'arena nuova")
+	await create_timer(main.scroll_time * 0.4).timeout
+	check(main.camera.position.x > cam_x0 + 300.0, "la telecamera scorre verso destra (%.0f -> %.0f)" % [cam_x0, main.camera.position.x])
+	await _wait_for(func(): return not main.transitioning, 4.0)
+	await frames(2)
+	check(main.arena.position == Vector2.ZERO and main.get_children().filter(func(c): return c is Arena and not c.is_queued_for_deletion()).size() == 1, "finito lo scorrimento resta solo la nuova arena, rimessa al suo posto")
 	check(main.phase == main.Phase.MATCH and main.arena.arena_name == "Arena di prova", "prima arena: %s" % main.arena.arena_name)
 	check(a.alive and b.alive and a.is_inside_tree(), "nella nuova arena ricompaiono tutti")
 	check(a.death_y == main.arena.death_y, "i personaggi conoscono il vuoto della nuova arena")
@@ -592,7 +625,8 @@ func _test_lobby_e_partita() -> void:
 	b.velocity = Vector2.ZERO
 	await frames(90)
 	check(main.wins[0] == 1 and main.falls[1] == 1, "in partita le statistiche contano")
-	await create_timer(2.8).timeout
+	await create_timer(2.6).timeout
+	await _wait_for(func(): return not main.transitioning, 4.0)
 	check(main.arena.arena_name == "Torri" and main.arenas_played == 1, "dopo il round si passa all'arena dopo: %s" % main.arena.arena_name)
 	var spawns: Array[Vector2] = main.arena.spawn_points()
 	check(a.global_position.distance_to(spawns[0]) < 60.0, "si riparte dai punti di partenza della nuova arena")
@@ -602,7 +636,9 @@ func _test_lobby_e_partita() -> void:
 	b.global_position = Vector2(1100, 1500)
 	b.velocity = Vector2.ZERO
 	await frames(90)
-	await create_timer(2.8).timeout
+	await create_timer(2.6).timeout
+	await _wait_for(func(): return not main.transitioning, 4.0)
+	await frames(3)
 	check(main.phase == main.Phase.LOBBY and main.arena.arena_name == "Lobby", "dopo %d arene si torna alla lobby" % main.arenas_per_lobby)
 	check(main.scoreboard.visible and main.total_arenas == 2, "la lobby mostra la classifica")
 	check(main.wins[0] == 2, "le statistiche restano per tutta la partita (vittorie A: %d)" % main.wins[0])
@@ -610,7 +646,8 @@ func _test_lobby_e_partita() -> void:
 	# Si riparte: l'ordine continua con la terza arena.
 	await frames(30)
 	await _punch_out(a, b, 1000.0, LOBBY_FLOOR)
-	await create_timer(1.8).timeout
+	await create_timer(1.6).timeout
+	await _wait_for(func(): return not main.transitioning, 4.0)
 	check(main.arena.arena_name == "Ponti" and not main.scoreboard.visible, "nuovo giro: si continua con l'arena dopo (%s)" % main.arena.arena_name)
 
 	# Ordine a caso: mai la stessa arena due volte di fila, e prima o poi escono tutte.
@@ -625,4 +662,4 @@ func _test_lobby_e_partita() -> void:
 			repeats += 1
 		prev = sc
 		seen[sc] = true
-	check(repeats == 0 and seen.size() == main.ARENA_SCENES.size(), "ordine a caso: escono tutte e mai due uguali di fila")
+	check(repeats == 0 and seen.size() == main.ARENA_PATHS.size(), "ordine a caso: escono tutte e mai due uguali di fila")

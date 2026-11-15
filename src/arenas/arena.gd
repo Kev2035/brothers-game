@@ -10,19 +10,47 @@ extends Node2D
 @export var top_margin := 450.0 ## quanto si può salire sopra lo schermo
 @export var death_margin := 250.0 ## quanto sotto il bordo dello schermo si muore
 
+## L'area inquadrata nel "mondo" (tiene conto di dove si trova l'arena:
+## durante il cambio di arena quella nuova sta accanto a quella vecchia).
+var world_bounds: Rect2:
+	get:
+		return Rect2(global_position + bounds.position, bounds.size)
+
 ## Sotto questa altezza si muore.
 var death_y: float:
 	get:
-		return bounds.end.y + death_margin
+		return world_bounds.end.y + death_margin
 
 ## Limiti laterali di sicurezza (normalmente non si raggiungono: ci sono i muri invisibili).
 var side_limits: Vector2:
 	get:
-		return Vector2(bounds.position.x - side_margin - 600.0, bounds.end.x + side_margin + 600.0)
+		var wb := world_bounds
+		return Vector2(wb.position.x - side_margin - 600.0, wb.end.x + side_margin + 600.0)
 
 
 func _ready() -> void:
+	# Lo sfondo sta sempre dietro a tutto, anche dietro alle piattaforme dell'arena
+	# accanto (durante lo scorrimento gli sfondi delle due arene si sovrappongono).
+	var bg := get_node_or_null("Background") as CanvasItem
+	if bg != null:
+		bg.z_index = -10
 	_build_invisible_walls()
+
+
+## Durante lo scorrimento taglia lo sfondo a una certa x del "mondo", così il confine
+## tra i due ambienti cade nello spazio vuoto tra le arene e non in mezzo a una di esse.
+## Senza argomenti rimette lo sfondo intero.
+func clip_background(left_x := -INF, right_x := INF) -> void:
+	var bg := get_node_or_null("Background") as Control
+	if bg == null:
+		return
+	if not bg.has_meta("full_left"):
+		bg.set_meta("full_left", bg.offset_left)
+		bg.set_meta("full_right", bg.offset_right)
+	var full_left: float = bg.get_meta("full_left")
+	var full_right: float = bg.get_meta("full_right")
+	bg.offset_left = maxf(full_left, left_x - global_position.x)
+	bg.offset_right = minf(full_right, right_x - global_position.x)
 
 
 func spawn_points() -> Array[Vector2]:
@@ -36,7 +64,7 @@ func _build_invisible_walls() -> void:
 	var left := bounds.position.x - side_margin
 	var right := bounds.end.x + side_margin
 	var top := bounds.position.y - top_margin
-	var bottom := death_y + 400.0
+	var bottom := bounds.end.y + death_margin + 400.0
 	var thick := 200.0
 	_add_wall(Rect2(left - thick, top - thick, thick, bottom - top + thick)) # sinistra
 	_add_wall(Rect2(right, top - thick, thick, bottom - top + thick)) # destra
