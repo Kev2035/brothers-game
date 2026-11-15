@@ -532,6 +532,7 @@ func _run() -> void:
 	main.start_round()
 
 	await _test_lobby_e_partita()
+	await _test_menu_pausa()
 
 	print("Risultati: %d ok, %d falliti" % [passed, failed])
 	quit(1 if failed > 0 else 0)
@@ -663,3 +664,105 @@ func _test_lobby_e_partita() -> void:
 		prev = sc
 		seen[sc] = true
 	check(repeats == 0 and seen.size() == main.ARENA_PATHS.size(), "ordine a caso: escono tutte e mai due uguali di fila")
+
+
+## Simula un tasto premuto e lasciato (come se lo premesse Kevin).
+func _press_key(k: Key) -> void:
+	var ev := InputEventKey.new()
+	ev.physical_keycode = k
+	ev.keycode = k
+	ev.pressed = true
+	root.push_input(ev)
+	await frames(1)
+	var up := ev.duplicate() as InputEventKey
+	up.pressed = false
+	root.push_input(up)
+	await frames(1)
+
+
+## Il pulsante del menu di pausa il cui testo comincia con `start`.
+func _menu_button(start: String) -> Button:
+	for b in main.pause_menu._buttons.get_children():
+		if b is Button and not b.is_queued_for_deletion() and b.text.begins_with(start):
+			return b
+	return null
+
+
+func _test_menu_pausa() -> void:
+	main.queue_free()
+	await frames(3)
+	main = load("res://src/core/main.tscn").instantiate()
+	root.add_child(main)
+	await frames(2)
+	var a = main.add_player("kb_b", -1, "kb_b")
+	var b = main.add_player("joy", 0, "joy_0")
+	await frames(30)
+	var menu = main.pause_menu
+
+	# Esc apre il menu e ferma tutto.
+	await _press_key(KEY_ESCAPE)
+	check(paused and menu.is_open and menu.visible and menu.page == "main", "Esc apre il menu di pausa e ferma il gioco")
+	b.global_position = Vector2(1000, 600) # in aria: senza pausa cadrebbe
+	var y0: float = b.global_position.y
+	await frames(30)
+	check(b.global_position.y == y0, "in pausa i personaggi restano fermi")
+
+	# Impostazioni nella lobby: si possono cambiare.
+	_menu_button("Impostazioni").pressed.emit()
+	await frames(3)
+	var order := _menu_button("Ordine")
+	var count := _menu_button("Arene")
+	check(menu.page == "settings" and order != null and not order.disabled and not count.disabled, "nella lobby le impostazioni si possono cambiare")
+	order.pressed.emit()
+	count.pressed.emit()
+	check(main.random_order and main.arenas_per_lobby == 5 and order.text.ends_with("a caso"), "il menu cambia ordine delle arene e numero di arene (%d)" % main.arenas_per_lobby)
+	order.pressed.emit()
+	check(not main.random_order and main._next_path == main.ARENA_PATHS[0], "tornando all'ordine fisso si riparte dalla prima arena")
+	await _press_key(KEY_ESCAPE)
+	check(menu.page == "main" and paused, "Esc nelle impostazioni torna alla pagina principale")
+	await _press_key(KEY_ESCAPE)
+	check(not paused and not menu.is_open, "Esc dalla pagina principale fa riprendere il gioco")
+	await frames(10)
+	check(b.global_position.y > y0, "dopo la pausa il gioco riparte")
+
+	# Si gioca una partita.
+	main.arenas_per_lobby = 2
+	await frames(60)
+	await _punch_out(a, b, 1000.0, 1098.0)
+	await create_timer(1.6).timeout
+	await _wait_for(func(): return not main.transitioning, 4.0)
+	check(main.phase == main.Phase.MATCH, "la partita parte")
+
+	# Round vinto e subito pausa: il gioco aspetta, non passa all'arena dopo.
+	await frames(20)
+	b.global_position = Vector2(PIT_X, 1500)
+	b.velocity = Vector2.ZERO
+	await _wait_for(func(): return not b.alive, 2.0)
+	main.open_pause()
+	await create_timer(3.5).timeout
+	check(not main.transitioning and main.arenas_played == 0 and main.arena.arena_name == "Arena di prova", "in pausa anche i timer si fermano (il round non passa)")
+
+	# In partita le impostazioni sono bloccate.
+	_menu_button("Impostazioni").pressed.emit()
+	await frames(3)
+	check(_menu_button("Ordine").disabled and _menu_button("Arene").disabled, "durante la partita le impostazioni sono bloccate")
+	_menu_button("Indietro").pressed.emit()
+	await frames(3)
+
+	# Esci dalla partita: classifica finale con il vincitore.
+	_menu_button("Esci").pressed.emit()
+	await frames(6)
+	var title: String = menu._end_table._title.text
+	check(menu.page == "end" and menu._end_table.visible and title.begins_with("VINCE ROSSO"), "fine partita: classifica finale con il vincitore (%s)" % title)
+	check(_menu_button("Nuova partita") != null and _menu_button("Chiudi") != null, "fine partita: si puo fare una nuova partita o chiudere il gioco")
+
+	# Nuova partita: statistiche a zero, si torna alla lobby.
+	_menu_button("Nuova partita").pressed.emit()
+	await frames(3)
+	check(not paused and not menu.is_open, "nuova partita: il menu si chiude")
+	await _wait_for(func(): return main.phase == main.Phase.LOBBY and not main.transitioning, 5.0)
+	await frames(3)
+	check(main.arena.arena_name == "Lobby" and main.wins[0] == 0 and main.kills[0] == 0 and main.total_arenas == 0, "nuova partita: si torna alla lobby con le statistiche a zero")
+	check(not main.scoreboard.visible, "nuova partita: nella lobby non c'e la classifica vecchia")
+	await create_timer(3.0).timeout
+	check(main.phase == main.Phase.LOBBY and main.arena.arena_name == "Lobby", "il vecchio round non fa partire niente dopo la nuova partita")

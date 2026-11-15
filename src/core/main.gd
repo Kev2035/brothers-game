@@ -9,7 +9,8 @@ extends Node2D
 ##   vecchia, i personaggi spariscono e la telecamera scorre fino a lì.
 ## - Un giocatore entra premendo il suo tasto di salto (fino a 4 posti).
 ## - F2 aggiunge il manichino d'allenamento / cambia cosa fa; F3 lo toglie.
-## - R (tastiera) o Start (joystick) fa ripartire il round.
+## - Esc (tastiera) o Start (joystick) apre il menu di pausa.
+## - R (tastiera) o Select/Back (joystick) fa ripartire il round (per le prove).
 
 enum Phase { LOBBY, MATCH }
 
@@ -94,6 +95,7 @@ var _round_id := 0 ## cambia a ogni round: i timer di un round vecchio non fanno
 var _joined := {} # "kb_a" / "kb_b" / "joy_0" ... -> slot
 var _banner: Label
 var camera: Camera2D
+var pause_menu: PauseMenu
 
 
 func _ready() -> void:
@@ -113,6 +115,13 @@ func _ready() -> void:
 	$HUD.add_child(_banner)
 	scoreboard = Scoreboard.new()
 	$HUD.add_child(scoreboard)
+	pause_menu = PauseMenu.new()
+	add_child(pause_menu)
+	pause_menu.resume_requested.connect(close_pause)
+	pause_menu.settings_changed.connect(_on_settings_changed)
+	pause_menu.end_requested.connect(end_match)
+	pause_menu.new_match_requested.connect(new_match)
+	pause_menu.quit_requested.connect(func(): get_tree().quit())
 	if fixed_arena != null:
 		phase = Phase.MATCH
 		load_arena(fixed_arena)
@@ -228,7 +237,7 @@ func _take_next_arena() -> PackedScene:
 func _begin_match() -> void:
 	_match_starting = true
 	_show_banner("FIGHT!", Color.WHITE)
-	await get_tree().create_timer(MATCH_START_DELAY).timeout
+	await get_tree().create_timer(MATCH_START_DELAY, false).timeout
 	if phase != Phase.LOBBY or not _match_starting:
 		return
 	_match_starting = false
@@ -260,7 +269,79 @@ func go_to_lobby() -> void:
 	await scroll_to_arena(LOBBY_SCENE)
 	_prepare_next_arena()
 	if total_arenas > 0 and phase == Phase.LOBBY:
-		scoreboard.show_table("CLASSIFICA  -  %d arene giocate" % total_arenas, _score_rows())
+		scoreboard.show_table("CLASSIFICA  -  %s" % _arenas_text(total_arenas), _score_rows())
+
+
+## --- Menu di pausa ---
+
+## Esc / Start: tutto si ferma (personaggi, proiettili, timer, scorrimento) e si apre il menu.
+func open_pause() -> void:
+	get_tree().paused = true
+	hud.visible = false # le scritte di aiuto non si sovrappongono al menu
+	# Le impostazioni si cambiano solo nella lobby, prima che la partita parta.
+	pause_menu.open(phase == Phase.LOBBY and not _match_starting, random_order, arenas_per_lobby)
+
+
+func close_pause() -> void:
+	pause_menu.close()
+	hud.visible = true
+	get_tree().paused = false
+
+
+func _on_settings_changed(new_random: bool, new_count: int) -> void:
+	arenas_per_lobby = new_count
+	if new_random != random_order:
+		random_order = new_random
+		# Si rifà la coda delle arene col nuovo ordine (anche quella già preparata).
+		_queue.clear()
+		if _next_path != "":
+			ResourceLoader.load_threaded_get(_next_path) # chiude il caricamento iniziato
+			_next_path = ""
+		_prepare_next_arena()
+	_update_hud()
+
+
+## "Esci dalla partita": classifica finale con il vincitore (il gioco resta in pausa).
+func end_match() -> void:
+	var rows := _score_rows()
+	Scoreboard.sort_rows(rows)
+	var title := "Nessuna arena giocata"
+	var color := Color.WHITE
+	# Conta anche un round appena vinto, se si esce prima di passare all'arena dopo.
+	var played := total_arenas + (1 if phase == Phase.MATCH and round_over and not transitioning else 0)
+	if played > 0 and not rows.is_empty():
+		var first: Dictionary = rows[0]
+		var tie: bool = rows.size() > 1 and rows[1].wins == first.wins and rows[1].kills == first.kills
+		if tie:
+			title = "PAREGGIO!  -  %s" % _arenas_text(played)
+		else:
+			title = "VINCE %s!  -  %s" % [String(first.name).to_upper(), _arenas_text(played)]
+			color = first.color
+	pause_menu.show_end(title, color, rows)
+
+
+## "Nuova partita": statistiche a zero e si torna alla lobby.
+func new_match() -> void:
+	close_pause()
+	_match_starting = false
+	for i in MAX_PLAYERS:
+		wins[i] = 0
+		falls[i] = 0
+		kills[i] = 0
+		damage_dealt[i] = 0.0
+	total_arenas = 0
+	arenas_played = 0
+	scoreboard.visible = false
+	while transitioning: # se la telecamera sta scorrendo, si aspetta che arrivi
+		await get_tree().process_frame
+	if phase == Phase.MATCH and fixed_arena == null:
+		go_to_lobby()
+	else:
+		start_round()
+
+
+func _arenas_text(n: int) -> String:
+	return "1 arena giocata" if n == 1 else "%d arene giocate" % n
 
 
 func _score_rows() -> Array:
@@ -294,6 +375,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif k == KEY_UP:
 			key = InputSetup.KEYBOARD_B
 			kind = InputSetup.KEYBOARD_B
+		elif k == KEY_ESCAPE:
+			open_pause()
+			get_viewport().set_input_as_handled()
+			return
 		elif k == KEY_R:
 			start_round()
 			return
@@ -313,6 +398,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			kind = InputSetup.JOYPAD
 			device = b.device
 		elif b.button_index == JOY_BUTTON_START:
+			open_pause()
+			get_viewport().set_input_as_handled()
+			return
+		elif b.button_index == JOY_BUTTON_BACK:
 			start_round()
 			return
 
@@ -488,7 +577,7 @@ func _on_player_died(p: Player, cause: String) -> void:
 		if phase == Phase.LOBBY and by_enemy and not _match_starting:
 			_begin_match()
 		var where := arena
-		await get_tree().create_timer(RESPAWN_DELAY).timeout
+		await get_tree().create_timer(RESPAWN_DELAY, false).timeout
 		if is_instance_valid(p) and not p.alive and arena == where and not transitioning:
 			p.respawn(arena.spawn_points()[p.slot])
 		return
@@ -511,7 +600,7 @@ func _on_player_died(p: Player, cause: String) -> void:
 		_show_banner("PAREGGIO!", Color.WHITE)
 	_update_hud()
 	var this_round := _round_id
-	await get_tree().create_timer(ROUND_END_DELAY).timeout
+	await get_tree().create_timer(ROUND_END_DELAY, false).timeout
 	if round_over and this_round == _round_id:
 		_after_round()
 
@@ -547,7 +636,7 @@ func _update_hud() -> void:
 		lines.append("PROVA ARENA: %s" % arena.arena_name)
 	else:
 		lines.append("PARTITA  -  arena %d di %d: %s" % [arenas_played + 1, arenas_per_lobby, arena.arena_name])
-	lines.append("PROTOTIPO 2c - PARTITA     R / Start = nuovo round     F2 = manichino (premi ancora: cambia cosa fa)   F3 = togli manichino   F4 = arma a tutti")
+	lines.append("PROTOTIPO 2c     Esc / Start = PAUSA     R / Select = nuovo round     F2 = manichino (premi ancora: cambia cosa fa)   F3 = togli manichino   F4 = arma a tutti")
 	if _free_slot() >= 0:
 		lines.append("Per entrare: W o Spazio (tastiera + mouse)  -  Freccia SU (tastiera frecce)  -  A sul joystick")
 	lines.append("Tastiera + mouse: A/D muovi, W/Spazio salta, S giu, mira col mouse, pugno o SPARO clic sinistro (o F), scudo clic destro (o E), lascia arma Q")

@@ -34,12 +34,11 @@ func _init() -> void:
 
 ## rows: un Dictionary per giocatore con name, color, wins, kills, falls, damage.
 ## Vengono messi in ordine: prima chi ha più vittorie, a pari vittorie chi ha più eliminazioni.
-func show_table(title: String, rows: Array) -> void:
-	rows.sort_custom(func(a, b):
-		if a.wins != b.wins:
-			return a.wins > b.wins
-		return a.kills > b.kills)
+## `title_color`: colore del titolo (per esempio il colore di chi ha vinto).
+func show_table(title: String, rows: Array, title_color := Color.WHITE) -> void:
+	sort_rows(rows)
 	_title.text = title
+	_title.add_theme_color_override("font_color", title_color)
 	for child in _grid.get_children():
 		child.queue_free()
 	for h in HEADERS:
@@ -57,6 +56,14 @@ func show_table(title: String, rows: Array) -> void:
 	reset_size()
 	var screen := get_viewport_rect().size
 	position = Vector2((screen.x - size.x) / 2.0, top_y)
+
+
+## Mette in ordine le righe: prima chi ha più vittorie, a pari vittorie chi ha più eliminazioni.
+static func sort_rows(rows: Array) -> void:
+	rows.sort_custom(func(a, b):
+		if a.wins != b.wins:
+			return a.wins > b.wins
+		return a.kills > b.kills)
 
 
 func _add_cell(text: String, color: Color, font_size: int) -> void:
