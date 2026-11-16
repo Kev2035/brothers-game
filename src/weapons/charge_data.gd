@@ -48,7 +48,7 @@ func tick(p: Player, delta: float, can_act: bool) -> void:
 ## si ferma al primo muro, come farà il colpo vero.
 func trajectory(p: Player, speed: float) -> PackedVector2Array:
 	var points := PackedVector2Array()
-	var start := p.muzzle_position()
+	var start := p.shot_origin()
 	var v := p.aim * speed
 	var g := Vector2(0.0, bullet_gravity)
 	var space := p.get_world_2d().direct_space_state

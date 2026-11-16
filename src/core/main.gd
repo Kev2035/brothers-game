@@ -30,6 +30,7 @@ const ARENA_PATHS: Array[String] = [
 	"res://src/arenas/bosco/radici.tscn",
 	"res://src/arenas/bosco/tronchi.tscn",
 	"res://src/arenas/bosco/piattaforme.tscn",
+	"res://src/arenas/bosco/perni.tscn",
 	"res://src/arenas/test_arena/test_arena.tscn",
 	"res://src/arenas/torri/torri.tscn",
 	"res://src/arenas/ponti/ponti.tscn",
@@ -214,6 +215,7 @@ func scroll_to_arena(scene: PackedScene) -> void:
 func _hide_player(p: Player) -> void:
 	p.visible = false
 	p.velocity = Vector2.ZERO
+	p.set_solid(false)
 	p.set_physics_process(false)
 
 
@@ -529,6 +531,8 @@ func start_round() -> void:
 		node.queue_free()
 	_spawn_timer = WEAPON_FIRST_DELAY
 	arena.place_fixed_weapons()
+	# Gli oggetti che si muovono a tempo (piattaforme a perno...) ripartono da capo.
+	get_tree().call_group("round_reset", "reset_round")
 	var spawns := arena.spawn_points()
 	for p in participants():
 		p.respawn(spawns[p.slot])

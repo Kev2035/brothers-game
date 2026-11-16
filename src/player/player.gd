@@ -67,6 +67,8 @@ signal damaged(victim: Player, attacker: Player, amount: float)
 
 const LAYER_SOLID := 1
 const LAYER_ONE_WAY := 2
+const LAYER_PLAYERS := 3 ## i personaggi sono "solidi" tra loro: non ci si passa attraverso
+const BODY_SIZE := Vector2(48, 88) ## ingombro del personaggio (come la forma di collisione)
 const OUTLINE := Color("1b1b2b")
 const BODY := Vector2(0, -52) ## centro del corpo rispetto ai piedi
 const BODY_RADIUS := 32.0
@@ -165,6 +167,7 @@ func _physics_process(delta: float) -> void:
 	if bot:
 		bot.think(self, delta)
 
+	_unstick_from_players()
 	var stunned := _hitstun_timer > 0.0
 	var input_x := 0.0 if stunned else _axis()
 	var down_held := not stunned and _held("down")
@@ -363,9 +366,33 @@ func _tick_timers(delta: float) -> void:
 func _wall_side() -> int:
 	for side in [-1, 1]:
 		var c := move_and_collide(Vector2(side * wall_detect, 0.0), true)
-		if c and not (c.get_collider() as Node).is_in_group("bounds"):
-			return side # i bordi invisibili dell'arena non contano come muri
+		if c and _is_wall(c.get_collider()):
+			return side
 	return 0
+
+
+## Un muro da cui si può saltare? I bordi invisibili dell'arena e gli altri
+## personaggi non contano.
+func _is_wall(collider: Object) -> bool:
+	return collider is Node and not (collider as Node).is_in_group("bounds") and not collider is Player
+
+
+## I personaggi sono solidi tra loro. Se per qualche motivo due si ritrovano uno
+## dentro l'altro (per esempio ricomparendo nello stesso punto), si allontanano di lato.
+func _unstick_from_players() -> void:
+	for node in get_tree().get_nodes_in_group("players"):
+		var p := node as Player
+		if p == null or p == self or not p.alive:
+			continue
+		var d := global_position - p.global_position
+		if absf(d.x) < BODY_SIZE.x - 4.0 and absf(d.y) < BODY_SIZE.y - 4.0:
+			var away := signf(d.x) if absf(d.x) > 0.5 else (1.0 if slot > p.slot else -1.0)
+			global_position.x += away * 6.0
+
+
+## Acceso = gli altri personaggi mi urtano; spento quando sono morto o nascosto.
+func set_solid(on: bool) -> void:
+	set_collision_layer_value(LAYER_PLAYERS, on)
 
 
 ## Sto volando verso un muro e lo toccherò entro il tempo del "buffer" del salto?
@@ -373,7 +400,7 @@ func _wall_ahead() -> bool:
 	if absf(velocity.x) < 50.0:
 		return false
 	var c := move_and_collide(Vector2(velocity.x * jump_buffer, 0.0), true)
-	return c != null and not (c.get_collider() as Node).is_in_group("bounds") and absf(c.get_normal().x) > 0.7
+	return c != null and _is_wall(c.get_collider()) and absf(c.get_normal().x) > 0.7
 
 
 func is_shielding() -> bool:
@@ -467,6 +494,7 @@ func _die(cause: String) -> void:
 		return
 	alive = false
 	visible = false
+	set_solid(false)
 	set_physics_process(false)
 	died.emit(self, cause)
 
@@ -509,9 +537,15 @@ func attack_held() -> bool:
 	return _held("attack")
 
 
-## Punto da cui esce il colpo (la punta dell'arma).
+## Punto in cui si vede la punta dell'arma (lampo dello sparo).
 func muzzle_position() -> Vector2:
 	return grip_position() + aim * weapon.length
+
+
+## Punto da cui parte davvero il colpo: il bordo del corpo, non la punta dell'arma.
+## Così si colpisce anche un avversario attaccato a noi, e non si spara "oltre" un muro sottile.
+func shot_origin() -> Vector2:
+	return global_position + BODY + aim * BODY_RADIUS
 
 
 ## Lascia cadere l'arma in mano: cade dov'è e resta lì con i colpi rimasti,
@@ -550,6 +584,7 @@ func respawn(at: Vector2) -> void:
 	set_collision_mask_value(LAYER_ONE_WAY, true)
 	alive = true
 	visible = true
+	set_solid(true)
 	set_physics_process(true)
 
 

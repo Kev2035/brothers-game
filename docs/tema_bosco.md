@@ -156,6 +156,17 @@ Costruendo le armi Claude ha aggiunto due numeri che nella tabella mancavano: **
 - 15 piattaforme su 4 piani: alcune su un solo albero (220 px), altre a ponte tra due alberi (590-680 px). Si attraversano tutte da sotto.
 - Sotto c'è il **vuoto**. Si parte dalle due piattaforme laterali in basso (solide), due giocatori per lato.
 
+### Livello 4 "Le piattaforme a perno": scelte fatte costruendolo (2026-11-15)
+
+File: `src/arenas/bosco/perni.tscn`; la piattaforma è `src/objects/pivot_platform.gd`.
+- Stessa disposizione del livello 3, ma **tutte le 15 piattaforme sono a perno** (feedback di Kevin del 2026-11-16: 5 erano poche e cedevano una alla volta).
+- Si muovono **tutte insieme, a fasi di 6 secondi**: 3 s di tremolio (la metà che sta per cedere trema sempre più forte e si arrossa), poi 3 s giù. A ogni fase **ogni piattaforma perde una metà**: prima un lato, alla fase dopo l'altro, e così via. Metà delle piattaforme comincia dal lato sinistro e metà dal destro. A ogni fase bisogna spostarsi.
+- Le due piattaforme di partenza saltano la prima fase (cominciano dopo 6 s), per non far cadere qualcuno appena iniziato il round.
+- **Sequenza fissa**: a ogni round tutto riparte uguale, quindi si può imparare.
+- Quando la metà cede, il "pavimento" sparisce subito: cadono il personaggio e anche le armi appoggiate sopra. Chi salta in quell'istante si salva.
+- **La metà abbassata è un muro solido** appeso al perno: ferma i colpi e ci si può fare il salto dai muri.
+- Tutti i tempi si cambiano dall'Inspector, piattaforma per piattaforma (gruppo "Tempi"). Per farle cadere insieme basta dare gli stessi tempi; "right_first" sceglie il lato che cede per primo.
+
 ### Quali armi cadono in quale livello *(proposta di Claude, da bilanciare)*
 
 Le armi dei primi livelli diventano **sempre più rare** salendo, e poi spariscono.

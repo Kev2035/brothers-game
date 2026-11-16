@@ -33,7 +33,7 @@ func fire(p: Player, speed: float) -> void:
 	p.fire_queued = 0.0
 	if muzzle_flash:
 		p.muzzle_flash = 0.06
-	var muzzle := p.muzzle_position()
+	var muzzle := p.shot_origin()
 	for i in pellets:
 		var spread := deg_to_rad(randf_range(-spread_deg, spread_deg) / 2.0)
 		var b := Bullet.new()

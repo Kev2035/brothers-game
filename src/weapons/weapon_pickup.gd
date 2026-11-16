@@ -43,6 +43,8 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	_bob += delta
 	queue_redraw()
+	if is_queued_for_deletion():
+		return # sta per sparire (nuovo round): non si può più raccogliere
 	if global_position.y > death_y:
 		queue_free()
 		return

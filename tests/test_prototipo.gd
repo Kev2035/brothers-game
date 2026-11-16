@@ -537,9 +537,11 @@ func _run() -> void:
 	check(p0.weapon != null, "allontanandosi e tornando l'arma lasciata si riprende")
 	main.start_round()
 
+	await _test_personaggi_solidi(p0, p1)
 	await _test_armi_bosco(p0, p1)
 	await _test_radici()
 	await _test_bosco_2_3()
+	await _test_perni()
 	await _test_lobby_e_partita()
 	await _test_menu_pausa()
 
@@ -1123,4 +1125,145 @@ func _test_bosco_2_3() -> void:
 	b.velocity = Vector2.ZERO
 	await _wait_for(func(): return not b.alive, 3.0)
 	check(not b.alive and main.falls[1] == falls_before + 1, "Piattaforme: si puo cadere nel vuoto")
+	await create_timer(2.8).timeout
+
+
+## Livello 4 del bosco: piattaforme a perno, tutte insieme a fasi.
+func _test_perni() -> void:
+	check(main.ARENA_PATHS[3].ends_with("perni.tscn"), "il livello 4 del bosco viene dopo il 3")
+	var pl: Array = await _open_arena("res://src/arenas/bosco/perni.tscn")
+	var a = pl[0]
+	var b = pl[1]
+	check(main.arena.arena_name == "Le piattaforme a perno" and a.is_on_floor() and b.is_on_floor(), "Perni: si parte sulle piattaforme laterali")
+	check(await _only_weapons(["knife", "axe", "crossbow"]), "Perni: cadono coltelli, asce e balestre")
+	var pivots: Array = get_nodes_in_group("round_reset").filter(func(n): return n is PivotPlatform)
+	check(pivots.size() == 15, "Perni: tutte le piattaforme sono a perno (%d)" % pivots.size())
+
+	# Ponte basso (1010..1600, y=1300, perno a x=1305): nella prima fase cede la metà sinistra.
+	var pv: PivotPlatform = main.arena.get_node("Platforms/Bridge23Low")
+	main.start_round()
+	await frames(2)
+	a.global_position = Vector2(1150, 1298) # metà sinistra
+	b.global_position = Vector2(1450, 1298) # metà destra
+	a.velocity = Vector2.ZERO
+	b.velocity = Vector2.ZERO
+	var gun = main.spawn_weapon(load("res://src/weapons/knife.tres"), 1250.0)
+	gun.global_position = Vector2(1250, 1200) # un'arma appoggiata sulla metà sinistra
+	await frames(90)
+	check(a.is_on_floor() and b.is_on_floor() and pv.is_trembling(-1) and not pv.is_trembling(1), "Perni: la meta che sta per cedere trema, ma regge ancora")
+	var trembling := 0
+	for p in pivots:
+		if p.is_trembling(-1) or p.is_trembling(1):
+			trembling += 1
+	check(trembling == 13, "Perni: tremano tante piattaforme insieme (%d su 15; le 2 di partenza aspettano)" % trembling)
+	check(gun.global_position.y < 1300.0, "Perni: l'arma e' appoggiata sulla piattaforma")
+	await frames(120) # siamo a ~3,5 s: la prima fase è scattata
+	var down_left := 0
+	var down_right := 0
+	for p in pivots:
+		down_left += 1 if p.is_down(-1) else 0
+		down_right += 1 if p.is_down(1) else 0
+	check(down_left + down_right == 13 and down_left >= 5 and down_right >= 5, "Perni: cedono tutte insieme, alcune a sinistra e altre a destra (%d + %d)" % [down_left, down_right])
+	check(pv.is_down(-1) and a.global_position.y > 1400.0, "Perni: dopo 3 s la meta ruota giu e chi c'e' sopra cade (y=%.0f)" % a.global_position.y)
+	check(b.is_on_floor() and absf(b.global_position.y - 1300.0) < 3.0, "Perni: l'altra meta resta solida")
+	check(not is_instance_valid(gun) or gun.global_position.y > 1400.0, "Perni: anche l'arma appoggiata cade")
+	await _wait_for(func(): return not a.alive, 3.0)
+	check(not a.alive, "Perni: sotto c'e' il vuoto")
+	await create_timer(2.8).timeout # nuovo round
+
+	# La metà abbassata è un muro appeso al perno: ci si può saltare contro.
+	main.start_round()
+	await frames(2)
+	b.global_position = Vector2(1450, 1298)
+	a.global_position = Vector2(1550, 1298) # intanto aspetta al sicuro sulla metà destra
+	a.velocity = Vector2.ZERO
+	await _wait_for(func(): return pv.is_wall(-1), 5.0)
+	await frames(2)
+	a.global_position = Vector2(1345, 1400) # subito a destra della metà che pende
+	a.velocity = Vector2.ZERO
+	a._air_jumps = 0
+	await frames(8)
+	check(pv.is_wall(-1) and a._wall_side() == -1, "Perni: la meta abbassata e' un muro")
+	await tap("p0_jump")
+	check(a.velocity.y < -300.0 and a.velocity.x > 200.0, "Perni: dalla meta abbassata si puo fare il salto dal muro")
+	await frames(60)
+
+	# La sequenza è fissa: a ogni round riparte uguale. Si controlla tutto un giro.
+	main.start_round()
+	await frames(2)
+	check(pv.time < 0.1 and pv.is_trembling(-1), "Perni: a ogni round la sequenza riparte da capo")
+	b.global_position = Vector2(300, 1000) # lontano dalle prove
+	var seq := ""
+	var last := ""
+	for i in int(pv.cycle_time() * 60.0) - 10:
+		var now := "L" if pv.is_down(-1) else ("R" if pv.is_down(1) else "-")
+		if now != last:
+			seq += now
+			last = now
+		await physics_frame
+	check(seq == "-L-R", "Perni: prima cede una meta, poi torna su, poi cede l'altra (%s)" % seq)
+	# Tornata su, la metà regge di nuovo e il muro non c'è più.
+	main.start_round()
+	await frames(2)
+	pv.time = pv.tremble_time + pv.down_time + 0.2
+	await frames(3)
+	a.global_position = Vector2(1150, 1250)
+	a.velocity = Vector2.ZERO
+	await frames(30)
+	check(a.is_on_floor() and absf(a.global_position.y - 1300.0) < 3.0 and not pv.is_wall(-1), "Perni: tornata su, la meta regge di nuovo")
+	main.start_round()
+
+
+## I personaggi sono solidi tra loro: non ci si passa attraverso.
+func _test_personaggi_solidi(p0, p1) -> void:
+	main.start_round()
+	await frames(20)
+	p0.global_position = Vector2(1000, GROUND)
+	p1.global_position = Vector2(1200, GROUND)
+	await frames(5)
+	Input.action_press("p0_right")
+	await frames(60)
+	Input.action_release("p0_right")
+	var gap: float = p1.global_position.x - p0.global_position.x
+	print("    P0 corre contro P1: si ferma a %.0f px (P1 a x=%.0f)" % [gap, p1.global_position.x])
+	check(gap > 44.0 and gap < 56.0, "i personaggi non si sovrappongono: ci si ferma contro l'avversario")
+	check(absf(p1.global_position.x - 1200.0) < 2.0, "correndogli contro l'avversario non viene spinto")
+	# A contatto il pugno arriva.
+	var hp: float = p1.health
+	await tap("p0_attack")
+	await frames(5)
+	check(p1.health < hp, "a contatto il pugno colpisce")
+	# Per passare dall'altra parte bisogna saltarlo.
+	p1.global_position = Vector2(480, GROUND)
+	p0.global_position = Vector2(600, GROUND)
+	await frames(5)
+	Input.action_press("p0_left")
+	Input.action_press("p0_jump")
+	await frames(45)
+	Input.action_release("p0_jump")
+	await frames(40)
+	Input.action_release("p0_left")
+	check(p0.global_position.x < p1.global_position.x - 40.0 and p0.is_on_floor() and p0.alive, "saltando si passa sopra l'avversario (x=%.0f)" % p0.global_position.x)
+	# Si può stare in piedi sulla testa dell'altro.
+	p0.global_position = Vector2(480, GROUND - 150)
+	p0.velocity = Vector2.ZERO
+	await frames(40)
+	check(p0.is_on_floor() and absf(p0.global_position.y - (GROUND - 88.0)) < 4.0, "si puo stare in piedi sulla testa dell'avversario (y=%.0f)" % p0.global_position.y)
+	# Due personaggi finiti nello stesso punto si separano da soli.
+	p0.global_position = Vector2(1200, GROUND)
+	p1.global_position = Vector2(1200, GROUND)
+	await frames(40)
+	gap = absf(p1.global_position.x - p0.global_position.x)
+	check(gap > 40.0, "due personaggi nello stesso punto si separano (%.0f px)" % gap)
+	# Un personaggio eliminato non fa da ostacolo invisibile.
+	main.start_round()
+	await frames(20)
+	p0.global_position = Vector2(1000, GROUND)
+	p1.global_position = Vector2(1200, GROUND)
+	await frames(3)
+	p1.take_hit(Vector2.RIGHT, p1.global_position, 999.0, null)
+	Input.action_press("p0_right")
+	await frames(40)
+	Input.action_release("p0_right")
+	check(not p1.alive and p0.global_position.x > 1250.0, "un personaggio eliminato non blocca il passaggio")
 	await create_timer(2.8).timeout
