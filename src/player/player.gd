@@ -111,6 +111,7 @@ var riding := false
 ## true quando sono dentro un nascondiglio (cespuglio, zona di buio): non mi si disegna affatto.
 var concealed := false
 var _eyes: Node2D
+var _held_light: PointLight2D ## luce dell'arma in mano, se ne fa (lanterna)
 var _slide_dir := Vector2.ZERO ## se sto su una piattaforma scivolosa: direzione "in discesa" (sennò zero)
 var _slide_speed := 0.0
 var _free_aim := false ## true se la mira arriva da mouse o levetta destra
@@ -327,6 +328,7 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	_read_floor()
 	_update_concealed()
+	_update_held_light()
 	_eyes.visible = Arena.night_eyes and not concealed
 	if _eyes.visible:
 		_eyes.queue_redraw()
@@ -479,6 +481,20 @@ func _read_floor() -> void:
 			_slide_dir = Vector2.ZERO
 
 
+## Alcune armi fanno luce mentre le tieni in mano (la lanterna): chi la porta
+## vede dove mette i piedi, ma lo vedono tutti.
+func _update_held_light() -> void:
+	var r := weapon.light_radius if weapon != null else 0.0
+	if r > 0.0 and _held_light == null:
+		_held_light = Fx.make_light(r, Color(1.0, 0.88, 0.62), 1.1)
+		_held_light.position = BODY
+		add_child(_held_light)
+	if _held_light != null:
+		_held_light.visible = r > 0.0 and not concealed
+		if r > 0.0:
+			_held_light.texture_scale = r * 2.0 / 256.0
+
+
 ## Sono dentro un nascondiglio? (I nascondigli stanno nel gruppo "hide_zones" e
 ## hanno la funzione hides(punto).)
 func _update_concealed() -> void:
@@ -527,6 +543,11 @@ func melee_hit(reach: float, cone_deg: float, damage: float) -> bool:
 		if in_reach and (in_cone or d.length() < BODY_RADIUS * 1.5):
 			if p.take_hit(aim, center, damage, self):
 				hit_someone = true
+	# Oggetti dell'arena che si attivano con un colpo (interruttori...).
+	for node in get_tree().get_nodes_in_group("hittables"):
+		var d: Vector2 = (node as Node2D).global_position - center
+		if d.length() < reach + node.hit_radius and (absf(rad_to_deg(aim.angle_to(d))) < cone_deg or d.length() < BODY_RADIUS * 1.5):
+			node.on_hit(self)
 	# Colpo verso il basso in aria che va a segno: rimbalzi sopra l'avversario.
 	if hit_someone and aim.y > 0.6 and not is_on_floor():
 		velocity.y = -pogo_bounce
@@ -689,6 +710,8 @@ func jump_speed() -> float:
 
 func respawn(at: Vector2) -> void:
 	riding = false
+	if _held_light != null:
+		_held_light.visible = false
 	concealed = false
 	global_position = at
 	velocity = Vector2.ZERO

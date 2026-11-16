@@ -49,6 +49,14 @@ func _physics_process(delta: float) -> void:
 	if not wall.is_empty():
 		wall_t = from.distance_to(wall.position) / maxf(from.distance_to(to), 0.001)
 
+	# Oggetti dell'arena che si attivano con un colpo (interruttori...).
+	for node in get_tree().get_nodes_in_group("hittables"):
+		var ht := _segment_circle(from, to, (node as Node2D).global_position, node.hit_radius)
+		if ht >= 0.0 and ht <= minf(best_t, wall_t):
+			node.on_hit(shooter)
+			queue_free()
+			return
+
 	if victim != null and best_t <= wall_t:
 		var hit_pos := from.lerp(to, best_t)
 		var hit := victim.take_hit(dir, hit_pos - dir * 60.0, damage, shooter)

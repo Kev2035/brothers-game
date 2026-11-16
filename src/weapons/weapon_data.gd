@@ -14,7 +14,7 @@ extends Resource
 ## quanti colpi servono per uccidere e quanto tempo passa tra un colpo e l'altro.
 
 enum Family { ONE_HAND, TWO_HAND } ## come si impugna (decide il disegno delle mani)
-enum Look { GUN, SWORD, KNIFE, AXE, SLING, CROSSBOW } ## disegno provvisorio
+enum Look { GUN, SWORD, KNIFE, AXE, SLING, CROSSBOW, LANTERN } ## disegno provvisorio
 
 @export var display_name := "Arma"
 @export var family := Family.ONE_HAND
@@ -23,6 +23,10 @@ enum Look { GUN, SWORD, KNIFE, AXE, SLING, CROSSBOW } ## disegno provvisorio
 @export var damage := 10.0 ## vita tolta da UN colpo (la vita totale è 100)
 @export var fire_interval := 0.25 ## secondi tra un colpo e l'altro
 @export var ammo := 10 ## colpi totali; finiti, l'arma sparisce. 0 = infiniti
+
+## Luce che fa mentre la tieni in mano o sta a terra (pixel; 0 = nessuna).
+## Conta solo nelle arene buie. La lanterna è l'arma che fa luce.
+@export var light_radius := 0.0
 
 @export_group("Aspetto")
 @export var look := Look.GUN

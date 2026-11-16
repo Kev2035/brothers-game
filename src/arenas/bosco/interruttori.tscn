@@ -1,0 +1,202 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://src/arenas/arena.gd" id="1_arena"]
+[ext_resource type="Script" path="res://src/objects/platform.gd" id="2_platform"]
+[ext_resource type="Script" path="res://src/weapons/weapon_data.gd" id="3_wdata"]
+[ext_resource type="Resource" path="res://src/weapons/crossbow.tres" id="4_crossbow"]
+[ext_resource type="Script" path="res://src/objects/light_source.gd" id="5_light"]
+[ext_resource type="Resource" path="res://src/weapons/knife.tres" id="6_knife"]
+[ext_resource type="Resource" path="res://src/weapons/sling.tres" id="7_sling"]
+[ext_resource type="Script" path="res://src/objects/light_switch.gd" id="8_switch"]
+
+[node name="Interruttori" type="Node2D"]
+script = ExtResource("1_arena")
+arena_name = "Gli interruttori"
+bounds = Rect2(0, 0, 3200, 1800)
+ambient = Color(0.012, 0.012, 0.03, 1)
+intro_light_time = 3.0
+sky_weapons = Dictionary[ExtResource("3_wdata"), float]({
+ExtResource("6_knife"): 2.0,
+ExtResource("7_sling"): 2.0,
+ExtResource("4_crossbow"): 1.5
+})
+
+[node name="Background" type="ColorRect" parent="."]
+offset_left = -1000.0
+offset_top = -1000.0
+offset_right = 4200.0
+offset_bottom = 2800.0
+mouse_filter = 2
+color = Color(0.2, 0.25, 0.38, 1)
+
+[node name="Decor" type="Node2D" parent="."]
+z_index = -5
+
+[node name="Trunk1" type="ColorRect" parent="Decor"]
+offset_left = 200.0
+offset_top = -1000.0
+offset_right = 460.0
+offset_bottom = 2800.0
+mouse_filter = 2
+color = Color(0.3, 0.22, 0.15, 1)
+
+[node name="Trunk2" type="ColorRect" parent="Decor"]
+offset_left = 880.0
+offset_top = -1000.0
+offset_right = 1140.0
+offset_bottom = 2800.0
+mouse_filter = 2
+color = Color(0.3, 0.22, 0.15, 1)
+
+[node name="Trunk3" type="ColorRect" parent="Decor"]
+offset_left = 1470.0
+offset_top = -1000.0
+offset_right = 1730.0
+offset_bottom = 2800.0
+mouse_filter = 2
+color = Color(0.3, 0.22, 0.15, 1)
+
+[node name="Trunk4" type="ColorRect" parent="Decor"]
+offset_left = 2060.0
+offset_top = -1000.0
+offset_right = 2320.0
+offset_bottom = 2800.0
+mouse_filter = 2
+color = Color(0.3, 0.22, 0.15, 1)
+
+[node name="Trunk5" type="ColorRect" parent="Decor"]
+offset_left = 2740.0
+offset_top = -1000.0
+offset_right = 3000.0
+offset_bottom = 2800.0
+mouse_filter = 2
+color = Color(0.3, 0.22, 0.15, 1)
+
+[node name="Platforms" type="Node2D" parent="."]
+
+[node name="GroundLeft" type="StaticBody2D" parent="Platforms"]
+position = Vector2(-250, 1560)
+script = ExtResource("2_platform")
+size = Vector2(1600, 600)
+color = Color(0.4, 0.3, 0.2, 1)
+
+[node name="GroundRight" type="StaticBody2D" parent="Platforms"]
+position = Vector2(1850, 1560)
+script = ExtResource("2_platform")
+size = Vector2(1600, 600)
+color = Color(0.4, 0.3, 0.2, 1)
+
+[node name="LowLeft" type="StaticBody2D" parent="Platforms"]
+position = Vector2(350, 1280)
+script = ExtResource("2_platform")
+size = Vector2(500, 24)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+
+[node name="LowRight" type="StaticBody2D" parent="Platforms"]
+position = Vector2(2350, 1280)
+script = ExtResource("2_platform")
+size = Vector2(500, 24)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+
+[node name="MidLeft" type="StaticBody2D" parent="Platforms"]
+position = Vector2(1000, 1030)
+script = ExtResource("2_platform")
+size = Vector2(400, 24)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+
+[node name="MidRight" type="StaticBody2D" parent="Platforms"]
+position = Vector2(1800, 1030)
+script = ExtResource("2_platform")
+size = Vector2(400, 24)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+
+[node name="TopLeft" type="StaticBody2D" parent="Platforms"]
+position = Vector2(250, 760)
+script = ExtResource("2_platform")
+size = Vector2(650, 24)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+
+[node name="TopRight" type="StaticBody2D" parent="Platforms"]
+position = Vector2(2300, 760)
+script = ExtResource("2_platform")
+size = Vector2(650, 24)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+
+[node name="TopCenter" type="StaticBody2D" parent="Platforms"]
+position = Vector2(1400, 620)
+script = ExtResource("2_platform")
+size = Vector2(400, 24)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+
+[node name="Lights" type="Node2D" parent="."]
+
+[node name="LampTopLeft" type="Node2D" parent="Lights"]
+position = Vector2(575, 500)
+script = ExtResource("5_light")
+radius = 600.0
+energy = 1.2
+start_off = true
+
+[node name="LampTopRight" type="Node2D" parent="Lights"]
+position = Vector2(2625, 500)
+script = ExtResource("5_light")
+radius = 600.0
+energy = 1.2
+start_off = true
+
+[node name="LampLowLeft" type="Node2D" parent="Lights"]
+position = Vector2(650, 1130)
+script = ExtResource("5_light")
+radius = 600.0
+energy = 1.2
+start_off = true
+
+[node name="LampLowRight" type="Node2D" parent="Lights"]
+position = Vector2(2550, 1130)
+script = ExtResource("5_light")
+radius = 600.0
+energy = 1.2
+start_off = true
+
+[node name="Switches" type="Node2D" parent="."]
+
+[node name="SwitchTopLeft" type="Node2D" parent="Switches"]
+position = Vector2(330, 716)
+script = ExtResource("8_switch")
+target = NodePath("../../Lights/LampLowRight")
+
+[node name="SwitchTopRight" type="Node2D" parent="Switches"]
+position = Vector2(2870, 716)
+script = ExtResource("8_switch")
+target = NodePath("../../Lights/LampLowLeft")
+
+[node name="SwitchLowLeft" type="Node2D" parent="Switches"]
+position = Vector2(230, 1516)
+script = ExtResource("8_switch")
+target = NodePath("../../Lights/LampTopRight")
+
+[node name="SwitchLowRight" type="Node2D" parent="Switches"]
+position = Vector2(2970, 1516)
+script = ExtResource("8_switch")
+target = NodePath("../../Lights/LampTopLeft")
+
+[node name="Spawns" type="Node2D" parent="."]
+
+[node name="Spawn1" type="Marker2D" parent="Spawns"]
+position = Vector2(700, 1558)
+
+[node name="Spawn2" type="Marker2D" parent="Spawns"]
+position = Vector2(2500, 1558)
+
+[node name="Spawn3" type="Marker2D" parent="Spawns"]
+position = Vector2(1100, 1558)
+
+[node name="Spawn4" type="Marker2D" parent="Spawns"]
+position = Vector2(2100, 1558)

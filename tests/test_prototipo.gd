@@ -548,6 +548,7 @@ func _run() -> void:
 	await _test_scivolo_aperto()
 	await _test_sottobosco()
 	await _test_notte()
+	await _test_buio_varianti()
 	await _test_scorrimento_oggetti()
 	await _test_lobby_e_partita()
 	await _test_menu_pausa()
@@ -1709,6 +1710,124 @@ func _test_notte() -> void:
 	await _wait_for(func(): return not main.transitioning, 4.0)
 	await frames(5)
 	check(mid < 0.95 and mid > 0.4 and main.ambient_light.color.is_equal_approx(main.arena.intro_ambient) and Arena.night, "passando a un'arena di notte la luce cala piano (a meta scorrimento %.2f)" % mid)
+
+
+## Le tre varianti del buio: funghi (livello 10), interruttori (11), lanterna (12).
+func _test_buio_varianti() -> void:
+	const DARK_WEAPONS := ["knife", "sling", "crossbow"]
+	check(main.ARENA_PATHS[9].ends_with("funghi.tscn") and main.ARENA_PATHS[10].ends_with("interruttori.tscn") and main.ARENA_PATHS[11].ends_with("lanterna.tscn"), "i tre livelli bui nuovi vengono dopo il 9")
+
+	# ---------- Livello 10: Il sentiero dei funghi ----------
+	var pl: Array = await _open_arena("res://src/arenas/bosco/funghi.tscn")
+	var a = pl[0]
+	var b = pl[1]
+	check(main.arena.arena_name == "Il sentiero dei funghi" and a.is_on_floor() and b.is_on_floor() and Arena.night, "Funghi: si parte in piedi, al buio")
+	check(await _only_weapons(DARK_WEAPONS), "Funghi: cadono coltelli, fionde e balestre")
+	var shrooms: Array = get_nodes_in_group("round_reset").filter(func(n): return n is GlowMushroom)
+	check(shrooms.size() == 13 and shrooms.all(func(m): return not m.is_lit()), "Funghi: 13 funghi, tutti spenti alla partenza (%d)" % shrooms.size())
+	# Non si cade: il terreno è pieno, ai lati c'è il bordo.
+	b.global_position = Vector2(3300, 1558)
+	b.velocity = Vector2(900, 0)
+	await frames(120)
+	check(b.alive and b.is_on_floor() and b.global_position.y < 1570.0, "Funghi: in questo livello non si puo cadere nel vuoto")
+	# Calpestando un fungo si accende e poi si spegne; saltandolo resta spento.
+	var m: GlowMushroom = main.arena.get_node("Mushrooms/Mushroom2") # sul terreno a x=800
+	a.global_position = Vector2(640, 1558)
+	await frames(5)
+	check(not m.is_lit(), "Funghi: da lontano il fungo resta spento")
+	Input.action_press("p0_right")
+	await _wait_for(func(): return m.is_lit(), 2.0)
+	Input.action_release("p0_right")
+	await frames(3)
+	check(m.is_lit() and m._light.energy > 0.5, "Funghi: calpestando un fungo si accende e illumina (luce %.1f)" % m._light.energy)
+	a.global_position = Vector2(1050, 1558)
+	await create_timer(m.glow_time + 0.3).timeout
+	check(not m.is_lit() and m._light.energy < 0.05, "Funghi: dopo un po' il fungo si spegne")
+	a.global_position = Vector2(700, 1558)
+	a.velocity = Vector2.ZERO
+	await frames(10)
+	Input.action_press("p0_right")
+	Input.action_press("p0_jump")
+	await frames(40)
+	Input.action_release("p0_jump")
+	Input.action_release("p0_right")
+	await frames(30)
+	check(a.global_position.x > 900.0 and not m.is_lit(), "Funghi: saltando sopra il fungo non lo si accende (x=%.0f)" % a.global_position.x)
+
+	# ---------- Livello 11: Gli interruttori ----------
+	pl = await _open_arena("res://src/arenas/bosco/interruttori.tscn")
+	a = pl[0]
+	b = pl[1]
+	check(main.arena.arena_name == "Gli interruttori" and a.is_on_floor() and b.is_on_floor() and Arena.night, "Interruttori: si parte in piedi, al buio")
+	check(await _only_weapons(DARK_WEAPONS), "Interruttori: cadono coltelli, fionde e balestre")
+	var switches: Array = get_nodes_in_group("hittables")
+	var lamps: Array = get_nodes_in_group("lights")
+	check(switches.size() == 4 and lamps.size() == 4 and lamps.all(func(l): return not l.is_on() and l._light.energy == 0.0), "Interruttori: 4 interruttori e 4 lanterne, tutte spente")
+	var sw: LightSwitch = main.arena.get_node("Switches/SwitchLowLeft") # a terra a sinistra (x=230)
+	var far: LightSource = main.arena.get_node("Lights/LampTopRight")
+	check(sw.lamp() == far and far.global_position.x > 2000.0 and far.global_position.y < 800.0, "Interruttori: quello in basso a sinistra comanda la lanterna in alto a destra")
+	# Un pugno sull'interruttore accende la zona opposta, per qualche secondo.
+	a.global_position = Vector2(330, 1558)
+	a.velocity = Vector2.ZERO
+	await frames(5)
+	Input.action_press("p0_left")
+	await frames(2)
+	Input.action_release("p0_left")
+	await tap("p0_attack")
+	await frames(20)
+	check(far.is_on() and far._light.energy > 0.8, "Interruttori: un pugno sull'interruttore accende la lanterna lontana (luce %.1f)" % far._light.energy)
+	check(lamps.filter(func(l): return l.is_on()).size() == 1, "Interruttori: si accende solo quella zona")
+	await create_timer(sw.on_time + 1.2).timeout
+	check(not far.is_on() and far._light.energy < 0.05, "Interruttori: dopo %.0f secondi la lanterna si spegne da sola" % sw.on_time)
+	# Funziona anche con un colpo da lontano.
+	a.global_position = Vector2(700, 1558)
+	a.equip(load("res://src/weapons/crossbow.tres"))
+	await frames(3)
+	Input.action_press("p0_left")
+	await frames(2)
+	Input.action_release("p0_left")
+	a.global_position = Vector2(700, 1558)
+	a.velocity = Vector2.ZERO
+	await frames(2)
+	await tap("p0_attack")
+	await frames(20)
+	check(far.is_on(), "Interruttori: si attivano anche con una freccia da lontano")
+	main.start_round()
+	await frames(5)
+	check(not far.is_on() and far._light.energy == 0.0, "Interruttori: a ogni round le lanterne ripartono spente")
+
+	# ---------- Livello 12: La lanterna ----------
+	pl = await _open_arena("res://src/arenas/bosco/lanterna.tscn")
+	a = pl[0]
+	b = pl[1]
+	var LANTERN: WeaponData = load("res://src/weapons/lantern.tres")
+	check(main.arena.arena_name == "La lanterna" and a.is_on_floor() and b.is_on_floor() and Arena.night, "Lanterna: si parte in piedi, al buio")
+	check(await _only_weapons(DARK_WEAPONS), "Lanterna: cadono coltelli, fionde e balestre")
+	var fixed := _fixed_pickups()
+	check(fixed.size() == 1 and fixed[0].data == LANTERN and fixed[0].get_children().any(func(c): return c is PointLight2D and c.texture_scale > 2.0), "Lanterna: al centro c'e' la lanterna, che fa luce")
+	# Chi la prende fa luce attorno a sé.
+	a.global_position = Vector2(1500, 1078)
+	a.velocity = Vector2.ZERO
+	Input.action_press("p0_right")
+	await _wait_for(func(): return a.weapon != null, 2.0)
+	Input.action_release("p0_right")
+	await frames(5)
+	check(a.weapon == LANTERN and a._held_light != null and a._held_light.visible, "Lanterna: chi la prende fa luce attorno a se")
+	# Si può usare per colpire (poco danno).
+	b.global_position = a.global_position + Vector2(90, 0)
+	b.velocity = Vector2.ZERO
+	await frames(5)
+	await tap("p0_attack")
+	await frames(5)
+	check(is_equal_approx(b.health, 100.0 - LANTERN.damage), "Lanterna: si puo usare per colpire (vita dell'altro %.0f)" % b.health)
+	# Lasciandola, la luce resta dove cade.
+	await tap("p0_drop")
+	await frames(30)
+	var dropped := get_nodes_in_group("pickups").filter(func(n): return not n.is_queued_for_deletion())
+	check(a.weapon == null and not a._held_light.visible and dropped.size() == 1 and dropped[0].get_children().any(func(c): return c is PointLight2D and c.texture_scale > 2.0), "Lanterna: lasciata a terra continua a fare luce li")
+	main.start_round()
+	await frames(5)
+	check(_fixed_pickups().size() == 1 and a.weapon == null, "Lanterna: a ogni round torna al centro")
 
 
 ## Gli oggetti che si muovono devono stare al loro posto anche quando l'arena arriva

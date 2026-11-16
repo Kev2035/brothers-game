@@ -226,6 +226,46 @@ Prima versione (buio leggero, 5 lanterne, 3 lucciole, 3 zone di buio pesto): **s
 - 11 piattaforme di legno su quattro piani, sotto c'è il vuoto. Si parte dalle due piattaforme laterali in basso.
 - Tutto questo (lampi, luci su colpi e armi, occhi) si attiva da solo in qualsiasi arena buia, cioè con la luce d'ambiente (`ambient`) molto scura.
 
+### I livelli al buio: da 1 a 4 (2026-11-16)
+
+A Kevin la dinamica del buio totale è piaciuta tanto da volerne almeno tre livelli: non si vede niente, colpire rivela la tua posizione (e puoi usarlo per capire dove sei), ma puoi anche muoverti in segreto ricordandoti le pedane e avvicinarti al nemico senza che se ne accorga. Claude ha ideato tre varianti, ognuna con un elemento nuovo, non solo pedane diverse. In tutti: buio pesto, sguardo iniziale di 3 secondi, lampi su chi colpisce o spara, e cadono coltelli, fionde e balestre.
+
+**Nuova numerazione del tema** (i livelli dopo il 9 scalano di tre):
+
+| N. | Livello | Elemento |
+|----|---------|----------|
+| 9 | Notte fonda | buio, lucciole, vuoto sotto |
+| 10 | Il sentiero dei funghi *(nuovo)* | non si cade; funghi che si accendono se li calpesti |
+| 11 | Gli interruttori *(nuovo)* | 4 zone, 4 interruttori che accendono la zona opposta |
+| 12 | La lanterna *(nuovo)* | una sola lanterna da portare in mano |
+| 13 | I corvi ladri (era il 10) | |
+| 14 | La tempesta (era l'11) | |
+| 15 | L'alba (era il 12) | |
+| 16 | La chioma e il nido (era il 13) | |
+| 17 | Il corvo gigante (era il 14) | |
+
+Nel resto del documento i numeri di questi ultimi cinque livelli sono ancora quelli vecchi.
+
+**Livello 10 "Il sentiero dei funghi"** (`funghi.tscn`, `src/objects/glow_mushroom.gd`)
+- **Non si cade** (richiesta di Kevin: più spazio allo stealth): il terreno è pieno da un bordo all'altro, con sei piattaforme sopra.
+- **13 funghi luminosi**: sette sul terreno e uno su ogni piattaforma. Spenti non si vedono. Chi ci passa sopra coi piedi li accende per circa 2 secondi: una luce azzurra di 260 px che **scopre chi l'ha calpestato**.
+- Nello sguardo iniziale si vede dove sono: poi bisogna ricordarseli e **saltarli** per muoversi di nascosto. Si possono anche calpestare apposta, per vedere dove si è o per illuminare un avversario vicino.
+- Due sole lucciole, che girano larghe e lente.
+
+**Livello 11 "Gli interruttori"** (`interruttori.tscn`, `src/objects/light_switch.gd`)
+- **4 zone** (in alto a sinistra, in alto a destra, in basso a sinistra, in basso a destra), ognuna con una lanterna grande (600 px) **spenta** e un **interruttore**.
+- Un colpo qualsiasi sull'interruttore (pugno, coltello, freccia, pietra) **accende per 4 secondi la lanterna della zona in diagonale**, cioè quella più lontana: serve a stanare l'avversario dall'altra parte. Colpirlo di nuovo fa ripartire i 4 secondi.
+- Gli interruttori fanno una lucina arancione, così al buio si ritrovano; ma chi ci va vicino si vede.
+- Nessuna lucciola: la luce c'è solo se qualcuno la accende. Terreno con un solo pozzo al centro (si può cadere, ma poco).
+
+**Livello 12 "La lanterna"** (`lanterna.tscn`, `src/weapons/lantern.tres`)
+- Al centro, su una piattaforma, c'è **una sola lanterna** (arma fissa del livello, come la spada di legno del livello 1).
+- Chi la prende **fa luce attorno a sé** (330 px): vede dove mette i piedi, ma lo vedono tutti. E ha la mano occupata: può solo dare colpi deboli con la lanterna (15 di danno).
+- Si può **lasciare a terra** col tasto: continua a fare luce lì, come esca o per illuminare un passaggio. Poi si raccoglie un'arma vera e si aspetta al buio.
+- Qui sotto c'è il vuoto, come nel livello 9. Due lucciole.
+
+Cose nuove nel motore, riutilizzabili: lanterne che si accendono a tempo (`start_off`, `turn_on`), oggetti che si attivano con un colpo (gruppo `hittables`, funzione `on_hit`), armi che fanno luce (`light_radius` nella scheda).
+
 ### Quali armi cadono in quale livello *(proposta di Claude, da bilanciare)*
 
 Le armi dei primi livelli diventano **sempre più rare** salendo, e poi spariscono.

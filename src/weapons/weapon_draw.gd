@@ -27,6 +27,8 @@ static func draw_weapon(ci: CanvasItem, grip: Vector2, dir: Vector2, data: Weapo
 			_sling(ci, data)
 		WeaponData.Look.CROSSBOW:
 			_crossbow(ci, data, loaded)
+		WeaponData.Look.LANTERN:
+			_lantern(ci, data)
 		_:
 			_gun(ci, data)
 	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
@@ -98,6 +100,13 @@ static func _sling(ci: CanvasItem, data: WeaponData) -> void:
 		ci.draw_line(fork, tip, OUTLINE, 10.0, true)
 		ci.draw_line(fork, tip, data.color, 6.0, true)
 	ci.draw_line(Vector2(L, -14.0), Vector2(L, 14.0), data.accent, 3.0, true) # elastico
+
+
+static func _lantern(ci: CanvasItem, data: WeaponData) -> void:
+	var L := data.length
+	_box(ci, Rect2(-8.0, -4.0, L - 22.0, 8.0), data.accent) # manico
+	_box(ci, Rect2(L - 34.0, -20.0, 34.0, 40.0), data.accent.darkened(0.2)) # gabbia
+	ci.draw_rect(Rect2(L - 28.0, -14.0, 22.0, 28.0), data.color) # la fiamma
 
 
 static func _crossbow(ci: CanvasItem, data: WeaponData, loaded: bool) -> void:

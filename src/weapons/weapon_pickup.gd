@@ -19,7 +19,9 @@ var _bob := 0.0
 func _ready() -> void:
 	add_to_group("round_temp")
 	add_to_group("pickups")
-	if Arena.night:
+	if data.light_radius > 0.0:
+		add_child(Fx.make_light(data.light_radius, Color(1.0, 0.88, 0.62), 1.1)) # la lanterna fa luce anche a terra
+	elif Arena.night:
 		add_child(Fx.make_light(110.0, Color(1.0, 0.95, 0.75), 0.8)) # al buio le armi a terra sono piccoli fari
 	lock_rotation = true
 	can_sleep = false # resta sempre "sveglia": cade se il pavimento sparisce e segue le piattaforme che si muovono
