@@ -33,7 +33,7 @@ func _physics_process(delta: float) -> void:
 	var victim: Player = null
 	for node in get_tree().get_nodes_in_group("players"):
 		var p := node as Player
-		if p == null or p == shooter or not p.alive:
+		if p == null or p == shooter or not p.alive or p.riding:
 			continue
 		var t := _segment_circle(from, to, p.global_position + Player.BODY, Player.BODY_RADIUS + 4.0)
 		if t >= 0.0 and t < best_t:

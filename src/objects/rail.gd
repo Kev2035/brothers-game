@@ -78,7 +78,8 @@ func _physics_process(delta: float) -> void:
 
 func _place() -> void:
 	for i in _bodies.size():
-		_bodies[i].position.x = platform_x(i)
+		# Posizione completa (non solo la x): così seguono l'arena anche quando viene spostata.
+		_bodies[i].position = Vector2(platform_x(i), 0.0)
 
 
 ## Spazio vuoto tra una piattaforma e la successiva.

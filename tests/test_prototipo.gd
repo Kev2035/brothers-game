@@ -544,6 +544,9 @@ func _run() -> void:
 	await _test_perni()
 	await _test_binari()
 	await _test_oblique()
+	await _test_ascensori()
+	await _test_scivolo_aperto()
+	await _test_scorrimento_oggetti()
 	await _test_lobby_e_partita()
 	await _test_menu_pausa()
 
@@ -1399,3 +1402,223 @@ func _test_oblique() -> void:
 	print("    Oblique: l'arma si ferma a x=%.0f y=%.0f" % [knife.global_position.x, knife.global_position.y])
 	check(knife.global_position.y > 800.0 and knife.global_position.y < 870.0 and knife.linear_velocity.length() < 20.0, "Oblique: l'arma si ferma sulla piattaforma piatta in fondo")
 	main.start_round()
+
+
+## Livello 7 del bosco: ascensori e scivoli a spirale.
+func _test_ascensori() -> void:
+	check(main.ARENA_PATHS[6].ends_with("ascensori.tscn"), "il livello 7 del bosco viene dopo il 6")
+	var pl: Array = await _open_arena("res://src/arenas/bosco/ascensori.tscn")
+	var a = pl[0]
+	var b = pl[1]
+	check(main.arena.arena_name == "Ascensori e scivoli" and a.is_on_floor() and b.is_on_floor(), "Ascensori: si parte in piedi sulle piattaforme basse")
+	check(await _only_weapons(["knife", "axe", "crossbow"]), "Ascensori: cadono coltelli, asce e balestre")
+	var elevators: Array = get_nodes_in_group("round_reset").filter(func(n): return n is Elevator)
+	var spirals: Array = get_nodes_in_group("round_reset").filter(func(n): return n is SpiralSlide)
+	check(elevators.size() == 3 and spirals.size() == 2, "Ascensori: 3 ascensori e 2 scivoli a spirale")
+
+	# --- Ascensore: sale e scende di continuo e trasporta chi c'è sopra. ---
+	var el: Elevator = main.arena.get_node("Platforms/ElevatorLeft")
+	main.start_round()
+	await frames(2)
+	var top_y: float = el.global_position.y
+	a.global_position = Vector2(260, top_y - 2.0)
+	a.velocity = Vector2.ZERO
+	var low := top_y
+	var high := 99999.0
+	var always_on := true
+	var went_down := false
+	for i in int((el.period + el.start_delay) * 60.0):
+		await physics_frame
+		low = maxf(low, a.global_position.y)
+		if a.global_position.y > top_y + el.travel - 30.0:
+			went_down = true
+		if went_down:
+			high = minf(high, a.global_position.y)
+		if i > 20 and not a.is_on_floor():
+			always_on = false
+	print("    Ascensore: il personaggio scende fino a y=%.0f e risale a y=%.0f (corsa %.0f)" % [low, high, el.travel])
+	check(low > top_y + el.travel - 30.0 and high < top_y + 40.0, "Ascensori: l'ascensore porta giu e poi di nuovo su chi c'e' sopra")
+	check(always_on and a.alive, "Ascensori: sull'ascensore si resta appoggiati per tutto il giro")
+	var center: Elevator = main.arena.get_node("Platforms/ElevatorCenter")
+	check(center.start_low and center.drop() != el.drop(), "Ascensori: gli ascensori non si muovono tutti insieme")
+
+	# --- Scivolo a spirale: prende chi arriva sull'imbocco e lo porta giù. ---
+	var sp: SpiralSlide = main.arena.get_node("Platforms/SpiralLeft")
+	main.start_round()
+	await frames(5)
+	b.global_position = Vector2(1600, 598) # P1 in mezzo alla piattaforma in alto: spara verso lo scivolo
+	b.velocity = Vector2.ZERO
+	a.global_position = sp.entry_point() + Vector2(80, -2) # sulla piattaforma, accanto all'imbocco
+	a.velocity = Vector2.ZERO
+	await frames(10)
+	check(a.is_on_floor() and not a.riding, "Ascensori: accanto all'imbocco non succede niente")
+	Input.action_press("p0_left")
+	await _wait_for(func(): return a.riding, 1.0)
+	Input.action_release("p0_left")
+	check(a.riding and sp.is_riding(a), "Ascensori: arrivando sull'imbocco si viene presi dallo scivolo")
+	var hp: float = a.health
+	var hit: bool = a.take_hit(Vector2.LEFT, b.global_position, 50.0, b)
+	check(not hit and a.health == hp, "Ascensori: sullo scivolo non si puo essere colpiti")
+	var hidden := false
+	var shown := false
+	var went_left := false
+	var went_right := false
+	var t := 0
+	Input.action_press("p0_right") # i comandi non contano: lo scivolo va da solo
+	while a.riding and t < 240:
+		await physics_frame
+		t += 1
+		if a.riding:
+			hidden = hidden or not a.visible
+			shown = shown or a.visible
+			went_left = went_left or a.global_position.x < sp.global_position.x - 80.0
+			went_right = went_right or a.global_position.x > sp.global_position.x + 80.0
+	Input.action_release("p0_right")
+	check(hidden and shown and went_left and went_right, "Ascensori: lo scivolo gira attorno al tronco e dietro il personaggio sparisce")
+	check(absf(t / 60.0 - sp.duration) < 0.2, "Ascensori: la discesa dura quanto previsto (%.1f s)" % (t / 60.0))
+	await frames(40)
+	print("    Scivolo: uscita a %s (prevista %s)" % [a.global_position, sp.exit_point()])
+	check(not a.riding and a.visible and a.is_on_floor() and absf(a.global_position.y - 1500.0) < 3.0 and a.global_position.x < sp.global_position.x, "Ascensori: in fondo si esce sulla piattaforma bassa, dall'altro lato del tronco")
+	hit = a.take_hit(Vector2.LEFT, a.global_position + Vector2(100, -50), 10.0, b)
+	check(hit and a.health == hp - 10.0, "Ascensori: usciti dallo scivolo si torna vulnerabili")
+
+	# Nuovo round a metà discesa: il personaggio torna normale.
+	main.start_round()
+	await frames(5)
+	a.global_position = sp.entry_point() + Vector2(0, -2)
+	a.velocity = Vector2.ZERO
+	await _wait_for(func(): return a.riding, 1.0)
+	await frames(30)
+	check(a.riding, "Ascensori: di nuovo sullo scivolo")
+	main.start_round()
+	await frames(20)
+	check(not a.riding and a.visible and a.is_on_floor() and a.global_position.distance_to(main.arena.spawn_points()[0]) < 30.0, "Ascensori: col nuovo round chi era sullo scivolo riparte normale")
+
+
+## Scivolo a spirale "aperto": ci si atterra in un punto qualsiasi e si salta fuori quando si vuole.
+## (Si usa l'arena del livello 7 già aperta da _test_ascensori.)
+func _test_scivolo_aperto() -> void:
+	var a = main.participants()[0]
+	var sp: SpiralSlide = main.arena.get_node("Platforms/SpiralLeft")
+	main.start_round()
+	await frames(5)
+
+	# Atterrando a metà scivolo (su un tratto davanti al tronco) la scivolata parte da lì.
+	a.global_position = sp.global_position + sp.point(0.5) + Vector2(0, -90)
+	a.velocity = Vector2.ZERO
+	a._air_jumps = 0
+	await _wait_for(func(): return a.riding, 1.0)
+	var start_k: float = sp._riders.get(a, -1.0) / sp.duration
+	print("    Scivolo aperto: atterrato a meta, la scivolata parte dal %.0f%% del percorso" % (start_k * 100.0))
+	check(a.riding and start_k > 0.4 and start_k < 0.6, "Scivolo: atterrando a meta si scivola da quel punto")
+	var t := 0
+	while a.riding and t < 240:
+		await physics_frame
+		t += 1
+	await frames(30)
+	check(absf(t / 60.0 - sp.duration * (1.0 - start_k)) < 0.2 and a.is_on_floor() and absf(a.global_position.y - 1500.0) < 3.0, "Scivolo: da meta si arriva in fondo in meta tempo (%.1f s)" % (t / 60.0))
+
+	# Un tratto dietro al tronco non si può prendere al volo: ci si passa davanti.
+	main.start_round()
+	await frames(5)
+	a.global_position = sp.global_position + sp.point(0.3) + Vector2(0, -60)
+	a.velocity = Vector2.ZERO
+	check(sp.is_behind(0.3), "Scivolo: al 30% il percorso passa dietro al tronco")
+	await frames(6)
+	check(not a.riding, "Scivolo: i tratti dietro al tronco non ti prendono")
+	await _wait_for(func(): return a.riding or a.is_on_floor(), 2.0)
+
+	# Dallo scivolo si salta fuori quando si vuole (e si riparte col doppio salto).
+	main.start_round()
+	await frames(5)
+	a.global_position = sp.entry_point() + Vector2(0, -2)
+	a.velocity = Vector2.ZERO
+	await _wait_for(func(): return a.riding, 1.0)
+	await frames(25)
+	check(a.riding, "Scivolo: sto scivolando")
+	var y_before: float = a.global_position.y
+	Input.action_press("p0_jump")
+	await frames(2)
+	check(not a.riding and a.visible and a.velocity.y < -500.0 and a._air_jumps == a.max_air_jumps, "Scivolo: col tasto del salto si salta fuori (velocita verticale %.0f)" % a.velocity.y)
+	await frames(8)
+	Input.action_release("p0_jump")
+	check(not a.riding and a.global_position.y < y_before - 60.0, "Scivolo: saltato fuori, lo scivolo non ti riprende subito")
+	# Tornando giù su un tratto dello scivolo, si riparte a scivolare da lì.
+	await _wait_for(func(): return a.riding or a.is_on_floor() or not a.alive, 3.0)
+	print("    Scivolo aperto: dopo il salto -> di nuovo sullo scivolo %s, a terra %s" % [a.riding, a.is_on_floor()])
+
+	# Con Giù ci si lascia cadere.
+	main.start_round()
+	await frames(5)
+	a.global_position = sp.entry_point() + Vector2(0, -2)
+	a.velocity = Vector2.ZERO
+	await _wait_for(func(): return a.riding, 1.0)
+	await frames(20)
+	Input.action_press("p0_down")
+	await frames(3)
+	Input.action_release("p0_down")
+	check(not a.riding and a.velocity.y > 0.0, "Scivolo: con Giu ci si lascia cadere")
+
+	# In piedi sulla piattaforma d'arrivo lo scivolo non ti riprende.
+	main.start_round()
+	await frames(5)
+	a.global_position = sp.exit_point() + Vector2(0, -2)
+	a.velocity = Vector2.ZERO
+	await frames(40)
+	check(not a.riding and a.is_on_floor(), "Scivolo: fermi all'uscita non si viene ripresi")
+	main.start_round()
+
+
+## Gli oggetti che si muovono devono stare al loro posto anche quando l'arena arriva
+## "a scorrimento" (come nel gioco vero), non solo quando viene caricata da sola.
+## E il menu "Scegli livello" deve portare subito al livello scelto.
+func _test_scorrimento_oggetti() -> void:
+	var pl: Array = await _open_arena("res://src/arenas/bosco/radici.tscn")
+	var a = pl[0]
+
+	# Livello 7 raggiunto scorrendo: gli ascensori devono essere dentro l'arena.
+	await main.scroll_to_arena(load("res://src/arenas/bosco/ascensori.tscn"))
+	await frames(20)
+	var el: Elevator = main.arena.get_node("Platforms/ElevatorLeft")
+	var ec: Elevator = main.arena.get_node("Platforms/ElevatorCenter")
+	print("    dopo lo scorrimento: ascensore sinistro a x=%.0f, centrale a x=%.0f" % [el.global_position.x, ec.global_position.x])
+	check(absf(el.global_position.x - 150.0) < 2.0 and absf(ec.global_position.x - 1490.0) < 2.0, "dopo lo scorrimento gli ascensori sono al loro posto")
+	a.global_position = Vector2(260, el.global_position.y - 2.0)
+	a.velocity = Vector2.ZERO
+	await frames(30)
+	check(a.is_on_floor(), "dopo lo scorrimento sull'ascensore ci si sta sopra")
+	# Dal basso si arriva in cima anche a salti, senza ascensori (piattaforma per piattaforma).
+	var steps: Array = [["LowLeft", 1500.0], ["MidLeft", 1170.0], ["MidLeftHigh", 850.0], ["TopLeft", 520.0]]
+	var jumpable := true
+	for i in steps.size() - 1:
+		if steps[i][1] - steps[i + 1][1] > a.jump_height + a.double_jump_height - 120.0:
+			jumpable = false
+		if main.arena.get_node_or_null("Platforms/" + steps[i + 1][0]) == null:
+			jumpable = false
+	check(jumpable, "Ascensori: le piattaforme a sinistra si salgono a salti, con margine")
+
+	# Livello 5 raggiunto scorrendo: le piattaforme dei binari devono essere sui binari.
+	await main.scroll_to_arena(load("res://src/arenas/bosco/binari.tscn"))
+	await frames(20)
+	var ok := true
+	for rail in get_nodes_in_group("round_reset").filter(func(n): return n is Rail and main.arena.is_ancestor_of(n)):
+		for i in rail._bodies.size():
+			var body: Node2D = rail._bodies[i]
+			if absf(body.global_position.y - rail.global_position.y) > 1.0 or absf(body.global_position.x - (rail.global_position.x + rail.platform_x(i))) > 1.0:
+				ok = false
+	check(ok and a.is_on_floor(), "dopo lo scorrimento le piattaforme dei binari sono al loro posto")
+
+	# Menu di pausa: "Scegli livello".
+	main.open_pause()
+	await frames(3)
+	var pick := _menu_button("Scegli livello")
+	check(pick != null, "il menu di pausa ha la voce per scegliere il livello")
+	pick.pressed.emit()
+	await frames(3)
+	var level7 := _menu_button("7.")
+	check(main.pause_menu.page == "levels" and level7 != null and _menu_button("1.") != null, "la pagina elenca i livelli (%s)" % (level7.text if level7 else "?"))
+	level7.pressed.emit()
+	await frames(10)
+	check(not paused and main.arena.arena_name == "Ascensori e scivoli" and a.alive, "scegliendo un livello ci si va subito")
+	var el2: Elevator = main.arena.get_node("Platforms/ElevatorLeft")
+	check(absf(el2.global_position.x - 150.0) < 2.0, "anche scegliendo il livello gli ascensori sono al loro posto")

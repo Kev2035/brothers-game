@@ -189,6 +189,17 @@ File: `src/arenas/bosco/oblique.tscn`; la piattaforma è `src/objects/slide_plat
 - Gli scivoli sono **solidi**: non ci si passa attraverso da sotto e fermano i colpi.
 - Lunghezza, inclinazione e velocità di ogni scivolo si cambiano dall'Inspector.
 
+### Livello 7 "Ascensori e scivoli": scelte fatte costruendolo (2026-11-16)
+
+File: `src/arenas/bosco/ascensori.tscn`; `src/objects/elevator.gd` e `src/objects/spiral_slide.gd`.
+- **Cielo grigio**: lo sfondo non è più verde. Alberi solo disegnati (tre grossi, due sottili), sotto c'è il vuoto.
+- **3 ascensori** appesi a due funi: due ai lati (corsa di 920 px, un giro in 8 s, partono dall'alto) e uno al centro (corsa di 800 px, un giro in 7 s, parte dal basso), così non si muovono tutti insieme. Rallentano in cima e in fondo. Trasportano personaggi e armi, e ci si sale da sotto. Fermi per 1 s a inizio round.
+- **2 scivoli a spirale** attorno ai due alberi sottili. Gli imbocchi sono alle due punte della piattaforma lunga in alto al centro; le uscite sulle piattaforme basse ai lati, 900 px più giù, dal lato opposto del tronco.
+- **Scivolo aperto** (idea di Kevin del 2026-11-16, al posto dello scivolo "chiuso" della prima versione): ci si sale dall'imbocco in alto **oppure atterrandoci sopra in un punto qualsiasi** dei tratti davanti al tronco, e la scivolata parte da lì. Si scende da soli (tutto il percorso in 1,8 s, due giri e mezzo), ma **si può saltare fuori quando si vuole** col tasto del salto, o lasciarsi cadere con Giù. Saltando fuori si riparte col doppio salto disponibile; ricadendo su un altro tratto si ricomincia a scivolare da lì.
+- Finché si scivola **non si può essere colpiti** (né pugni, né armi, né proiettili) e non si attacca. Quando lo scivolo passa dietro al tronco il personaggio **sparisce** e ricompare dall'altra parte; i tratti dietro al tronco non si possono prendere al volo. Arrivati in fondo si riceve una piccola spinta di lato.
+- Piattaforme fisse: tre in basso (da cui si parte), quattro a metà (due per lato, a scaletta: si sale in cima anche a salti, senza ascensore), due in alto ai lati e quella lunga in alto al centro.
+- Corsa, tempi, giri e durata si cambiano dall'Inspector.
+
 ### Quali armi cadono in quale livello *(proposta di Claude, da bilanciare)*
 
 Le armi dei primi livelli diventano **sempre più rare** salendo, e poi spariscono.

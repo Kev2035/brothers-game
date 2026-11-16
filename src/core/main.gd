@@ -33,6 +33,7 @@ const ARENA_PATHS: Array[String] = [
 	"res://src/arenas/bosco/perni.tscn",
 	"res://src/arenas/bosco/binari.tscn",
 	"res://src/arenas/bosco/oblique.tscn",
+	"res://src/arenas/bosco/ascensori.tscn",
 	"res://src/arenas/test_arena/test_arena.tscn",
 	"res://src/arenas/torri/torri.tscn",
 	"res://src/arenas/ponti/ponti.tscn",
@@ -143,6 +144,9 @@ func _ready() -> void:
 	pause_menu.end_requested.connect(end_match)
 	pause_menu.new_match_requested.connect(new_match)
 	pause_menu.quit_requested.connect(func(): get_tree().quit())
+	pause_menu.level_requested.connect(jump_to_arena)
+	for path in arena_paths:
+		pause_menu.level_names.append(path.get_file().get_basename().capitalize())
 	if fixed_arena != null:
 		phase = Phase.MATCH
 		load_arena(fixed_arena)
@@ -360,6 +364,25 @@ func new_match() -> void:
 		go_to_lobby()
 	else:
 		start_round()
+
+
+## "Scegli livello" del menu di pausa (provvisorio, per le prove): si va subito
+## all'arena scelta, e la partita prosegue da lì nell'ordine normale.
+func jump_to_arena(index: int) -> void:
+	close_pause()
+	while transitioning: # se la telecamera sta scorrendo, si aspetta che arrivi
+		await get_tree().process_frame
+	_match_starting = false
+	phase = Phase.MATCH
+	arenas_played = 0
+	scoreboard.visible = false
+	if _next_path != "":
+		ResourceLoader.load_threaded_get(_next_path) # chiude il caricamento già iniziato
+		_next_path = ""
+	_queue = arena_paths.slice(index + 1)
+	_last_path = arena_paths[index]
+	load_arena(load(arena_paths[index]))
+	_prepare_next_arena()
 
 
 func _arenas_text(n: int) -> String:

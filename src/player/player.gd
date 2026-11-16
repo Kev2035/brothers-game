@@ -106,6 +106,8 @@ var _run_phase := 0.0
 var _squash := 0.0
 var _was_on_floor := false
 var _on_one_way := false
+## true mentre uno scivolo a spirale mi sta portando giù: non comando io e non posso essere colpito.
+var riding := false
 var _slide_dir := Vector2.ZERO ## se sto su una piattaforma scivolosa: direzione "in discesa" (sennò zero)
 var _slide_speed := 0.0
 var _free_aim := false ## true se la mira arriva da mouse o levetta destra
@@ -168,6 +170,8 @@ func _just(a: String) -> bool:
 
 
 func _physics_process(delta: float) -> void:
+	if riding:
+		return # mi sta muovendo lo scivolo
 	_recompute_jump() # così i cambi fatti dall'Inspector valgono subito
 	_tick_timers(delta)
 	if bot:
@@ -489,8 +493,8 @@ func melee_hit(reach: float, cone_deg: float, damage: float) -> bool:
 ## altrimenti spinta nella direzione del colpo e un attimo senza controllo (ritorna true).
 ## Servirà uguale per i proiettili: from_pos sarà il punto da cui arriva la pallottola.
 func take_hit(direction: Vector2, from_pos: Vector2, damage := 0.0, attacker: Player = null) -> bool:
-	if not alive:
-		return false
+	if not alive or riding:
+		return false # sullo scivolo a spirale non si può essere colpiti
 	if is_shielding():
 		var incoming := from_pos - (global_position + BODY)
 		if absf(rad_to_deg(_shield_dir.angle_to(incoming))) <= shield_half_angle():
@@ -598,7 +602,45 @@ func grip_position() -> Vector2:
 	return global_position + BODY + aim * 30.0
 
 
+## Uno scivolo a spirale prende il personaggio: da qui lo muove lui.
+func start_ride() -> void:
+	riding = true
+	velocity = Vector2.ZERO
+	_shield_t = -1.0
+	_punch_t = -1.0
+	cancel_charge()
+	set_solid(false)
+
+
+## Fine dello scivolo: il personaggio torna comandabile, con una spinta di uscita.
+## Si riparte col doppio salto disponibile, come se si fosse toccato terra.
+func end_ride(exit_velocity: Vector2) -> void:
+	riding = false
+	visible = alive
+	velocity = exit_velocity
+	_air_jumps = max_air_jumps
+	_jump_held_cut = false
+	_buffer = 0.0
+	set_solid(alive)
+
+
+## Per gli oggetti che portano in giro il personaggio (scivolo a spirale):
+## ha appena premuto il salto? Sta tenendo giù? (Il manichino non risponde.)
+func jump_just_pressed() -> bool:
+	return bot == null and _just("jump")
+
+
+func down_is_held() -> bool:
+	return bot == null and _held("down")
+
+
+## Velocità verso l'alto di un salto normale.
+func jump_speed() -> float:
+	return _jump_velocity
+
+
 func respawn(at: Vector2) -> void:
+	riding = false
 	global_position = at
 	velocity = Vector2.ZERO
 	_hitstun_timer = 0.0

@@ -14,6 +14,7 @@ signal new_match_requested
 signal quit_requested
 signal end_requested
 signal settings_changed(random_order: bool, arenas_per_lobby: int)
+signal level_requested(index: int) ## "Scegli livello" (solo per le prove)
 
 ## Le scelte possibili per "quante arene prima di tornare alla lobby".
 const ARENA_CHOICES: Array[int] = [3, 5, 10, 20]
@@ -24,6 +25,8 @@ var page := "" ## "main", "settings" o "end"
 var _random_order := false
 var _arenas := 3
 var _can_edit := true
+## Nomi dei livelli per la pagina "Scegli livello" (li dà il gestore partita).
+var level_names: Array[String] = []
 
 var _dim: ColorRect
 var _panel: PanelContainer
@@ -111,6 +114,8 @@ func show_main() -> void:
 	_clear_buttons()
 	_add_button("Riprendi", func(): resume_requested.emit())
 	_add_button("Impostazioni", show_settings)
+	if not level_names.is_empty():
+		_add_button("Scegli livello (prova)", show_levels)
 	_add_button("Esci dalla partita", func(): end_requested.emit())
 	_place_panel(-1.0)
 
@@ -137,6 +142,22 @@ func show_settings() -> void:
 		_note.text = "Premi su una voce per cambiarla"
 	else:
 		_note.text = "Si possono cambiare solo nella lobby, prima di iniziare la partita"
+	_place_panel(-1.0)
+
+
+## Pagina provvisoria per le prove: si salta subito al livello scelto.
+func show_levels() -> void:
+	page = "levels"
+	_title.text = "SCEGLI LIVELLO"
+	_note.text = "Solo per le prove: si va subito a quel livello, poi la partita prosegue da lì"
+	_clear_buttons()
+	for i in level_names.size():
+		var b := _add_button("%d.  %s" % [i + 1, level_names[i]], func(): level_requested.emit(i))
+		b.add_theme_font_size_override("font_size", 26)
+		b.custom_minimum_size = Vector2(620, 48)
+	var back := _add_button("Indietro", show_main)
+	back.add_theme_font_size_override("font_size", 26)
+	back.custom_minimum_size = Vector2(620, 48)
 	_place_panel(-1.0)
 
 
@@ -201,7 +222,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not (back or start):
 		return
 	get_viewport().set_input_as_handled()
-	if page == "settings" and back:
+	if (page == "settings" or page == "levels") and back:
 		show_main()
 	elif page == "main":
 		resume_requested.emit() # Esc, B o Start: si torna a giocare
