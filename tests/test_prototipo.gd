@@ -542,6 +542,7 @@ func _run() -> void:
 	await _test_radici()
 	await _test_bosco_2_3()
 	await _test_perni()
+	await _test_binari()
 	await _test_lobby_e_partita()
 	await _test_menu_pausa()
 
@@ -1267,3 +1268,71 @@ func _test_personaggi_solidi(p0, p1) -> void:
 	Input.action_release("p0_right")
 	check(not p1.alive and p0.global_position.x > 1250.0, "un personaggio eliminato non blocca il passaggio")
 	await create_timer(2.8).timeout
+
+
+## Livello 5 del bosco: i binari con le piattaforme che scorrono.
+func _test_binari() -> void:
+	check(main.ARENA_PATHS[4].ends_with("binari.tscn"), "il livello 5 del bosco viene dopo il 4")
+	var pl: Array = await _open_arena("res://src/arenas/bosco/binari.tscn")
+	var a = pl[0]
+	var b = pl[1]
+	var rails: Array = get_nodes_in_group("round_reset").filter(func(n): return n is Rail)
+	rails.sort_custom(func(x, y): return x.global_position.y > y.global_position.y) # dal basso verso l'alto
+	check(rails.size() == 5, "Binari: ci sono 5 piani di binari (%d)" % rails.size())
+	var alternate := true
+	for i in rails.size() - 1:
+		if signf(rails[i].speed) == signf(rails[i + 1].speed):
+			alternate = false
+	check(alternate, "Binari: ogni piano scorre in senso opposto a quello sotto")
+	check(await _only_weapons(["knife", "axe", "crossbow"]), "Binari: cadono coltelli, asce e balestre")
+
+	# Si parte fermi, in piedi su una piattaforma.
+	main.start_round()
+	await frames(30)
+	var ax0: float = a.global_position.x
+	check(main.arena.arena_name == "I binari" and a.is_on_floor() and b.is_on_floor(), "Binari: si parte in piedi sulle piattaforme")
+	await frames(60)
+	check(absf(a.global_position.x - ax0) < 1.0 and rails[0].travelled() == 0.0, "Binari: all'inizio le piattaforme sono ferme")
+	# Poi partono e trasportano chi c'è sopra (il piano più basso va verso destra).
+	var gun = main.spawn_weapon(load("res://src/weapons/knife.tres"), b.global_position.x + 60.0)
+	gun.global_position = Vector2(b.global_position.x + 90.0, b.global_position.y - 120.0)
+	await frames(150) # siamo a 4 s dall'inizio del round
+	var moved: float = a.global_position.x - ax0
+	print("    Binari: dopo 4 s il personaggio e' stato trasportato di %.0f px (la fila di %.0f)" % [moved, rails[0].travelled()])
+	check(a.is_on_floor() and moved > 100.0 and absf(moved - rails[0].travelled()) < 15.0, "Binari: la piattaforma trasporta chi c'e' sopra")
+	check(is_instance_valid(gun) and gun.global_position.y < b.global_position.y + 30.0, "Binari: le armi restano appoggiate sulle piattaforme che si muovono")
+	# Il piano sopra va dall'altra parte: saltandoci si viene portati indietro.
+	var up_x0: float = rails[1].travelled()
+	await frames(30)
+	var up_moved: float = rails[1].travelled() - up_x0
+	check(up_moved < -50.0 and up_moved > -200.0, "Binari: il secondo piano scorre verso sinistra (%.0f px in mezzo secondo)" % up_moved)
+	# Le piattaforme che escono da un lato rientrano dall'altro, fuori dallo schermo.
+	main.start_round() # da capo, così nei prossimi 7 secondi nessuno cade e il round non ricomincia
+	await frames(2)
+	var rail: Rail = rails[0]
+	var wrapped := false
+	var on_screen_jump := false
+	var prev: Array = []
+	for i in rail.lengths.size():
+		prev.append(rail.platform_x(i))
+	for f in 420:
+		await physics_frame
+		for i in rail.lengths.size():
+			var x: float = rail.platform_x(i)
+			if absf(x - prev[i]) > 500.0:
+				wrapped = true
+				var gx_old: float = rail.global_position.x + prev[i]
+				var gx_new: float = rail.global_position.x + x
+				# Né il punto da cui sparisce né quello in cui ricompare si devono vedere.
+				if gx_old < 3450.0 or gx_new + rail.lengths[i] > -250.0:
+					on_screen_jump = true
+			prev[i] = x
+	check(wrapped and not on_screen_jump, "Binari: le piattaforme rientrano dall'altro lato senza che si veda")
+	# Restando fermi si finisce fuori: sotto c'è il vuoto.
+	await _wait_for(func(): return not a.alive or not b.alive, 20.0)
+	check(not a.alive or not b.alive, "Binari: restando fermi si viene portati fuori e si cade nel vuoto")
+	await create_timer(2.8).timeout
+	# Nuovo round: tutto torna al punto di partenza.
+	main.start_round()
+	await frames(20)
+	check(rails[0].time < 0.5 and a.is_on_floor() and absf(a.global_position.x - ax0) < 2.0, "Binari: a ogni round le piattaforme ripartono dallo stesso punto")

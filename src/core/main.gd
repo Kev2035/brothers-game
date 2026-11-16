@@ -31,6 +31,7 @@ const ARENA_PATHS: Array[String] = [
 	"res://src/arenas/bosco/tronchi.tscn",
 	"res://src/arenas/bosco/piattaforme.tscn",
 	"res://src/arenas/bosco/perni.tscn",
+	"res://src/arenas/bosco/binari.tscn",
 	"res://src/arenas/test_arena/test_arena.tscn",
 	"res://src/arenas/torri/torri.tscn",
 	"res://src/arenas/ponti/ponti.tscn",

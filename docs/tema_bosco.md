@@ -167,6 +167,17 @@ File: `src/arenas/bosco/perni.tscn`; la piattaforma è `src/objects/pivot_platfo
 - **La metà abbassata è un muro solido** appeso al perno: ferma i colpi e ci si può fare il salto dai muri.
 - Tutti i tempi si cambiano dall'Inspector, piattaforma per piattaforma (gruppo "Tempi"). Per farle cadere insieme basta dare gli stessi tempi; "right_first" sceglie il lato che cede per primo.
 
+### Livello 5 "I binari": scelte fatte costruendolo (2026-11-16)
+
+File: `src/arenas/bosco/binari.tscn`; il binario è `src/objects/rail.gd`.
+- **5 piani di binari** (uno ogni 220 px), ognuno con 7-8 piattaforme lunghe da 220 a 420 px, con circa 260-330 px di vuoto tra una e l'altra. Gli alberoni sono solo disegnati, sotto c'è il vuoto.
+- Ogni piano scorre **in senso opposto** a quello sotto, a velocità diverse (150-220 px al secondo; il più basso va verso destra).
+- **Si parte fermi**: per 2 secondi non si muove niente, poi le piattaforme partono piano e arrivano alla velocità piena in 1,5 secondi.
+- Le piattaforme trasportano chi c'è sopra, e anche le armi appoggiate. Si attraversano da sotto.
+- Quando una piattaforma esce da un lato rientra dall'altro, fuori dallo schermo: la fila non finisce mai. Chi resta fermo viene portato contro il bordo invisibile e cade.
+- Sequenza fissa: a ogni round le piattaforme ripartono dallo stesso punto.
+- Lunghezze, velocità, attesa iniziale e sfalsamento si cambiano dall'Inspector, binario per binario.
+
 ### Quali armi cadono in quale livello *(proposta di Claude, da bilanciare)*
 
 Le armi dei primi livelli diventano **sempre più rare** salendo, e poi spariscono.

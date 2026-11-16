@@ -20,6 +20,7 @@ func _ready() -> void:
 	add_to_group("round_temp")
 	add_to_group("pickups")
 	lock_rotation = true
+	can_sleep = false # resta sempre "sveglia": cade se il pavimento sparisce e segue le piattaforme che si muovono
 	gravity_scale = 1.6
 	collision_layer = 0
 	set_collision_layer_value(4, true)
