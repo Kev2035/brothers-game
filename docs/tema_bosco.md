@@ -178,6 +178,17 @@ File: `src/arenas/bosco/binari.tscn`; il binario è `src/objects/rail.gd`.
 - Sequenza fissa: a ogni round le piattaforme ripartono dallo stesso punto.
 - Lunghezze, velocità, attesa iniziale e sfalsamento si cambiano dall'Inspector, binario per binario.
 
+### Livello 6 "Le piattaforme oblique": scelte fatte costruendolo (2026-11-16)
+
+File: `src/arenas/bosco/oblique.tscn`; la piattaforma è `src/objects/slide_platform.gd`.
+- **6 scivoli** (verdi, con le freccette che indicano la discesa) lunghi 600 px e inclinati di 22°, disposti a zig-zag su tre piani: dall'alto si scivola verso il centro, poi verso i lati, poi di nuovo verso il centro.
+- **6 piattaforme piatte** di legno dove ci si ferma: due in alto ai lati, una al centro, due in basso ai lati (da qui si parte) e una in fondo al centro. Sotto c'è il vuoto.
+- Sullo scivolo **si va giù per forza** a 1200 px al secondo, quasi il doppio della corsa (feedback di Kevin del 2026-11-16: a 650 era troppo piano; servono riflessi, se non salti subito ti tira giù). Spingendo in discesa si va il 30% più veloci, spingendo in salita il 30% più piano, ma non ci si ferma e non si risale: per risalire bisogna saltare.
+- **Anche le armi scivolano**: quelle che cadono su uno scivolo finiscono sulla piattaforma dopo (lo scivolo non ha attrito).
+- Mentre si scivola si può **saltare** e colpire. In fondo si viene lanciati sulla piattaforma dopo.
+- Gli scivoli sono **solidi**: non ci si passa attraverso da sotto e fermano i colpi.
+- Lunghezza, inclinazione e velocità di ogni scivolo si cambiano dall'Inspector.
+
 ### Quali armi cadono in quale livello *(proposta di Claude, da bilanciare)*
 
 Le armi dei primi livelli diventano **sempre più rare** salendo, e poi spariscono.

@@ -41,6 +41,10 @@ signal damaged(victim: Player, attacker: Player, amount: float)
 @export var wall_detect := 28.0 ## distanza (pixel) entro cui il muro "vale": non serve toccarlo al millimetro
 @export var wall_slide_speed := 500.0 ## spingendo contro un muro scivoli giù al massimo a questa velocità (0 = niente)
 
+@export_group("Piattaforme scivolose")
+@export var slide_accel := 9000.0 ## quanto in fretta si prende velocità su una piattaforma obliqua
+@export var slide_control := 0.3 ## quanto conta la direzione premuta: 0.3 = in discesa +30%, in salita -30%
+
 @export_group("Scudo")
 @export var shield_duration := 0.45 ## secondi prima che l'arco sparisca del tutto
 @export var shield_max_half_angle := 90.0 ## apertura iniziale: 90 = semicerchio
@@ -102,6 +106,8 @@ var _run_phase := 0.0
 var _squash := 0.0
 var _was_on_floor := false
 var _on_one_way := false
+var _slide_dir := Vector2.ZERO ## se sto su una piattaforma scivolosa: direzione "in discesa" (sennò zero)
+var _slide_speed := 0.0
 var _free_aim := false ## true se la mira arriva da mouse o levetta destra
 var _wall_lock := 0.0
 var _shield_t := -1.0 ## tempo da quando hai alzato lo scudo (-1 = niente scudo)
@@ -249,7 +255,16 @@ func _physics_process(delta: float) -> void:
 		accel = ground_accel if absf(input_x) > 0.01 else ground_decel
 	else:
 		accel = air_accel if absf(input_x) > 0.01 else air_decel
-	velocity.x = move_toward(velocity.x, input_x * run_speed, accel * delta)
+	if on_floor and _slide_dir != Vector2.ZERO:
+		# Piattaforma obliqua e scivolosa: si va giù per forza. Spingere in discesa
+		# accelera un po', spingere in salita frena un po' (ma non ci si ferma).
+		var push := 1.0 + slide_control * input_x * signf(_slide_dir.x)
+		var target := _slide_dir * _slide_speed * push
+		velocity.x = move_toward(velocity.x, target.x, slide_accel * delta)
+		if velocity.y >= 0.0: # se sto saltando, il salto non si tocca
+			velocity.y = absf(velocity.x) * _slide_dir.y / maxf(absf(_slide_dir.x), 0.01)
+	else:
+		velocity.x = move_toward(velocity.x, input_x * run_speed, accel * delta)
 
 	# Mira e verso in cui guarda il personaggio.
 	_update_aim()
@@ -416,11 +431,25 @@ func shield_half_angle() -> float:
 
 func _read_floor() -> void:
 	_on_one_way = false
+	# Mentre si scorre lungo un pavimento Godot non segnala l'urto a ogni fotogramma:
+	# per questo la scivolata "si ricorda" finché si resta a terra e non si tocca un altro pavimento.
+	if not is_on_floor():
+		_slide_dir = Vector2.ZERO
 	for i in get_slide_collision_count():
 		var c := get_slide_collision(i)
 		var other := c.get_collider()
-		if c.get_normal().y < -0.7 and other is Node and (other as Node).is_in_group("one_way"):
+		var n := c.get_normal()
+		if n.y >= -0.7:
+			continue # non è un pavimento
+		if other is Node and (other as Node).is_in_group("one_way"):
 			_on_one_way = true
+		if other is SlidePlatform and is_on_floor():
+			# La direzione "in discesa" lungo la piattaforma.
+			var along := Vector2(-n.y, n.x)
+			_slide_dir = along if along.y > 0.0 else -along
+			_slide_speed = (other as SlidePlatform).slide_speed
+		else:
+			_slide_dir = Vector2.ZERO
 
 
 ## Il colpo è istantaneo nel momento in cui premi: l'animazione è solo grafica.

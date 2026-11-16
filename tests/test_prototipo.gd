@@ -543,6 +543,7 @@ func _run() -> void:
 	await _test_bosco_2_3()
 	await _test_perni()
 	await _test_binari()
+	await _test_oblique()
 	await _test_lobby_e_partita()
 	await _test_menu_pausa()
 
@@ -1336,3 +1337,65 @@ func _test_binari() -> void:
 	main.start_round()
 	await frames(20)
 	check(rails[0].time < 0.5 and a.is_on_floor() and absf(a.global_position.x - ax0) < 2.0, "Binari: a ogni round le piattaforme ripartono dallo stesso punto")
+
+
+## Livello 6 del bosco: piattaforme oblique su cui si scivola.
+func _test_oblique() -> void:
+	check(main.ARENA_PATHS[5].ends_with("oblique.tscn"), "il livello 6 del bosco viene dopo il 5")
+	var pl: Array = await _open_arena("res://src/arenas/bosco/oblique.tscn")
+	var a = pl[0]
+	var b = pl[1]
+	check(main.arena.arena_name == "Le piattaforme oblique" and a.is_on_floor() and b.is_on_floor(), "Oblique: si parte in piedi sulle piattaforme piatte")
+	check(await _only_weapons(["knife", "axe", "crossbow"]), "Oblique: cadono coltelli, asce e balestre")
+	var ax0: float = a.global_position.x
+	await frames(40)
+	check(absf(a.global_position.x - ax0) < 1.0, "Oblique: sulle piattaforme piatte non si scivola")
+
+	# Scivolo in alto a sinistra: parte da (760, 520) e scende verso destra.
+	a.global_position = Vector2(900, 480)
+	a.velocity = Vector2.ZERO
+	await frames(16)
+	var x1: float = a.global_position.x
+	var y1: float = a.global_position.y
+	check(a.is_on_floor() and a.velocity.x > 700.0, "Oblique: atterrando su una piattaforma obliqua si scivola (velocita %.0f)" % a.velocity.x)
+	# Spingendo in salita si rallenta ma si continua a scendere.
+	Input.action_press("p0_left")
+	await frames(8)
+	Input.action_release("p0_left")
+	check(a.global_position.x > x1 + 40.0 and a.global_position.y > y1 + 15.0, "Oblique: non si puo risalire, si continua a scivolare giu")
+	# In fondo si viene lanciati sulla piattaforma dopo (quella piatta al centro, y=860).
+	await _wait_for(func(): return a.is_on_floor() and absf(a.global_position.y - 860.0) < 3.0, 3.0)
+	await frames(30)
+	print("    Oblique: dallo scivolo in alto si arriva a x=%.0f y=%.0f" % [a.global_position.x, a.global_position.y])
+	check(a.is_on_floor() and absf(a.global_position.y - 860.0) < 3.0 and absf(a.velocity.x) < 5.0, "Oblique: in fondo allo scivolo si atterra sulla piattaforma dopo e ci si ferma")
+
+	# Mentre si scivola si può saltare.
+	a.global_position = Vector2(900, 480)
+	a.velocity = Vector2.ZERO
+	await frames(16)
+	Input.action_press("p0_jump")
+	await frames(3)
+	check(a.velocity.y < -500.0 and not a.is_on_floor(), "Oblique: mentre si scivola si puo saltare")
+	Input.action_release("p0_jump")
+	await frames(90)
+
+	# Lo scivolo verso sinistra funziona allo specchio.
+	b.global_position = Vector2(2300, 480)
+	b.velocity = Vector2.ZERO
+	await frames(16)
+	check(b.is_on_floor() and b.velocity.x < -700.0, "Oblique: lo scivolo a destra porta verso sinistra (velocita %.0f)" % b.velocity.x)
+	await frames(90)
+
+	# Anche le armi scivolano: cadute su uno scivolo finiscono sulla piattaforma dopo.
+	main.start_round()
+	await frames(5)
+	var knife = main.spawn_weapon(load("res://src/weapons/knife.tres"), 900.0)
+	knife.global_position = Vector2(900, 480)
+	await frames(40)
+	var kx: float = knife.global_position.x
+	await frames(60)
+	check(knife.global_position.x > kx + 100.0, "Oblique: anche le armi scivolano giu (%.0f px in 1 s)" % (knife.global_position.x - kx))
+	await frames(180)
+	print("    Oblique: l'arma si ferma a x=%.0f y=%.0f" % [knife.global_position.x, knife.global_position.y])
+	check(knife.global_position.y > 800.0 and knife.global_position.y < 870.0 and knife.linear_velocity.length() < 20.0, "Oblique: l'arma si ferma sulla piattaforma piatta in fondo")
+	main.start_round()
