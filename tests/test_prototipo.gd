@@ -546,6 +546,7 @@ func _run() -> void:
 	await _test_oblique()
 	await _test_ascensori()
 	await _test_scivolo_aperto()
+	await _test_sottobosco()
 	await _test_scorrimento_oggetti()
 	await _test_lobby_e_partita()
 	await _test_menu_pausa()
@@ -1567,6 +1568,55 @@ func _test_scivolo_aperto() -> void:
 	await frames(40)
 	check(not a.riding and a.is_on_floor(), "Scivolo: fermi all'uscita non si viene ripresi")
 	main.start_round()
+
+
+## Livello 8 del bosco: il sottobosco con i cespugli in cui nascondersi.
+func _test_sottobosco() -> void:
+	check(main.ARENA_PATHS[7].ends_with("sottobosco.tscn"), "il livello 8 del bosco viene dopo il 7")
+	var pl: Array = await _open_arena("res://src/arenas/bosco/sottobosco.tscn")
+	var a = pl[0]
+	var b = pl[1]
+	check(main.arena.arena_name == "Il sottobosco" and a.is_on_floor() and b.is_on_floor(), "Sottobosco: si parte in piedi sul terreno")
+	check(not a.concealed and not b.concealed, "Sottobosco: alla partenza nessuno e' nascosto")
+	check(await _only_weapons(["knife", "axe", "crossbow"]), "Sottobosco: cadono coltelli, asce e balestre")
+	var bushes: Array = get_nodes_in_group("hide_zones")
+	check(bushes.size() == 7, "Sottobosco: ci sono 7 cespugli (%d)" % bushes.size())
+	var bush: Bush = main.arena.get_node("Bushes/BushLeft2") # sul terreno, da x=880 a x=1180
+	check(bush.z_index > 0, "Sottobosco: il cespuglio si disegna sopra ai personaggi")
+
+	# Entrando nel cespuglio si sparisce, uscendo si ricompare.
+	a.global_position = Vector2(780, 1498)
+	await frames(5)
+	Input.action_press("p0_right")
+	await _wait_for(func(): return a.concealed, 2.0)
+	var hidden_x: float = a.global_position.x
+	Input.action_release("p0_right")
+	await frames(20)
+	check(a.concealed and hidden_x > 880.0 and hidden_x < 1000.0, "Sottobosco: entrando nel cespuglio si sparisce (da x=%.0f)" % hidden_x)
+	check(a.visible and a.alive, "Sottobosco: nascosto non vuol dire tolto dal gioco")
+	# Dentro si resta colpibili.
+	var hp: float = a.health
+	check(a.take_hit(Vector2.LEFT, a.global_position + Vector2(100, -50), 10.0, b) and a.health == hp - 10.0, "Sottobosco: nel cespuglio si puo essere colpiti")
+	# Il cespuglio si agita se chi è dentro si muove, e si calma se sta fermo.
+	await frames(60)
+	var calm: float = bush._shake
+	Input.action_press("p0_right")
+	await frames(10)
+	var moving: float = bush._shake
+	Input.action_release("p0_right")
+	check(calm < 0.05 and moving > 0.5, "Sottobosco: il cespuglio si agita quando ci si muove dentro (%.2f -> %.2f)" % [calm, moving])
+	Input.action_press("p0_right")
+	await _wait_for(func(): return not a.concealed, 2.0)
+	Input.action_release("p0_right")
+	check(not a.concealed and a.global_position.x > 1140.0, "Sottobosco: uscendo dal cespuglio si ricompare (x=%.0f)" % a.global_position.x)
+	# Saltando sopra il cespuglio non si è nascosti.
+	a.global_position = Vector2(1030, 1498 - 260)
+	a.velocity = Vector2.ZERO
+	await frames(2)
+	check(not a.concealed, "Sottobosco: sopra il cespuglio non si e' nascosti")
+	main.start_round()
+	await frames(5)
+	check(not a.concealed, "Sottobosco: a ogni round si riparte visibili")
 
 
 ## Gli oggetti che si muovono devono stare al loro posto anche quando l'arena arriva

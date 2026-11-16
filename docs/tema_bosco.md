@@ -200,6 +200,16 @@ File: `src/arenas/bosco/ascensori.tscn`; `src/objects/elevator.gd` e `src/object
 - Piattaforme fisse: tre in basso (da cui si parte), quattro a metà (due per lato, a scaletta: si sale in cima anche a salti, senza ascensore), due in alto ai lati e quella lunga in alto al centro.
 - Corsa, tempi, giri e durata si cambiano dall'Inspector.
 
+### Livello 8 "Il sottobosco": scelte fatte costruendolo (2026-11-16)
+
+File: `src/arenas/bosco/sottobosco.tscn`; il cespuglio è `src/objects/bush.gd`.
+- **Arena semplice**, come nel documento: due grandi pezzi di terreno con un pozzo (il vuoto) al centro, un ponte di legno sopra il pozzo, due sporgenze ai lati e una piattaforma in alto al centro. Cielo scuro da tramonto, alberi solo disegnati.
+- **7 cespugli**: quattro sul terreno, uno sul ponte e uno su ogni sporgenza.
+- Chi entra in un cespuglio col corpo **sparisce del tutto**: personaggio, puntino di mira e arma. Sul bordo resta mezzo coperto. Anche le armi cadute dentro sono nascoste.
+- Dentro si resta **colpibili**, e i colpi che partono dal cespuglio si vedono.
+- *(Aggiunta di Claude)* Quando chi è dentro si muove o colpisce, il **cespuglio si agita**: un indizio per chi guarda con attenzione, così nascondersi non è una vittoria sicura. Stando fermi il cespuglio resta immobile. Si può spegnere cespuglio per cespuglio ("rustle").
+- Lo stesso meccanismo servirà per le zone di buio pesto del livello 9 (gruppo `hide_zones`).
+
 ### Quali armi cadono in quale livello *(proposta di Claude, da bilanciare)*
 
 Le armi dei primi livelli diventano **sempre più rare** salendo, e poi spariscono.

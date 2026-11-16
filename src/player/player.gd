@@ -108,6 +108,8 @@ var _was_on_floor := false
 var _on_one_way := false
 ## true mentre uno scivolo a spirale mi sta portando giù: non comando io e non posso essere colpito.
 var riding := false
+## true quando sono dentro un nascondiglio (cespuglio, zona di buio): non mi si disegna affatto.
+var concealed := false
 var _slide_dir := Vector2.ZERO ## se sto su una piattaforma scivolosa: direzione "in discesa" (sennò zero)
 var _slide_speed := 0.0
 var _free_aim := false ## true se la mira arriva da mouse o levetta destra
@@ -307,6 +309,7 @@ func _physics_process(delta: float) -> void:
 
 	move_and_slide()
 	_read_floor()
+	_update_concealed()
 
 	if is_on_floor() and not _was_on_floor:
 		_squash = 1.0 # atterraggio: il pupazzetto si schiaccia un attimo
@@ -454,6 +457,22 @@ func _read_floor() -> void:
 			_slide_speed = (other as SlidePlatform).slide_speed
 		else:
 			_slide_dir = Vector2.ZERO
+
+
+## Sono dentro un nascondiglio? (I nascondigli stanno nel gruppo "hide_zones" e
+## hanno la funzione hides(punto).)
+func _update_concealed() -> void:
+	concealed = false
+	var center := global_position + BODY
+	for zone in get_tree().get_nodes_in_group("hide_zones"):
+		if zone.hides(center):
+			concealed = true
+			return
+
+
+## Sto colpendo o sparando in questo momento? (Serve ai cespugli per agitarsi.)
+func is_attacking() -> bool:
+	return _punch_t >= 0.0 or muzzle_flash > 0.0 or (swing_t >= 0.0 and swing_t < 0.2) or charge >= 0.0
 
 
 ## Il colpo è istantaneo nel momento in cui premi: l'animazione è solo grafica.
@@ -641,6 +660,7 @@ func jump_speed() -> float:
 
 func respawn(at: Vector2) -> void:
 	riding = false
+	concealed = false
 	global_position = at
 	velocity = Vector2.ZERO
 	_hitstun_timer = 0.0
@@ -674,6 +694,8 @@ func _punch_extension() -> float:
 # Sarà sostituito dalla grafica vera senza cambiare il movimento.
 # ---------------------------------------------------------------------------
 func _draw() -> void:
+	if concealed:
+		return # nascosto: non si vede niente (né corpo, né mira, né arma)
 	var sy := 1.0 - _squash * 0.22
 	var sx := 1.0 + _squash * 0.18
 	# Colpito: il pupazzetto trema (solo il disegno, non si sposta davvero).
