@@ -547,6 +547,7 @@ func _run() -> void:
 	await _test_ascensori()
 	await _test_scivolo_aperto()
 	await _test_sottobosco()
+	await _test_notte()
 	await _test_scorrimento_oggetti()
 	await _test_lobby_e_partita()
 	await _test_menu_pausa()
@@ -1617,6 +1618,97 @@ func _test_sottobosco() -> void:
 	main.start_round()
 	await frames(5)
 	check(not a.concealed, "Sottobosco: a ogni round si riparte visibili")
+
+
+## Livello 9 del bosco: buio pesto, solo lucciole, lampi di luce quando si colpisce.
+func _test_notte() -> void:
+	check(main.ARENA_PATHS[8].ends_with("notte.tscn"), "il livello 9 del bosco viene dopo l'8")
+	var pl: Array = await _open_arena("res://src/arenas/bosco/notte.tscn")
+	var a = pl[0]
+	var b = pl[1]
+	var arena: Arena = main.arena
+	check(arena.arena_name == "Notte fonda" and a.is_on_floor() and b.is_on_floor(), "Notte: si parte in piedi sulle piattaforme laterali")
+	check(await _only_weapons(["knife", "sling", "crossbow"]), "Notte: cadono coltelli, fionde e balestre (niente asce)")
+	check(arena.is_dark() and arena.ambient.get_luminance() < 0.05 and Arena.night, "Notte: buio pesto (luce d'ambiente %.3f)" % arena.ambient.get_luminance())
+	var lights: Array = get_nodes_in_group("lights")
+	check(lights.size() == 5 and lights.all(func(l): return not l.hanging and l.wander > 0.0), "Notte: solo lucciole che girano, niente lanterne (%d)" % lights.size())
+	check(get_nodes_in_group("hide_zones").is_empty(), "Notte: non servono zone di buio a parte, e' buia tutta l'arena")
+	var fly_pos: Vector2 = lights[0].global_position
+	await frames(60)
+	check(lights[0].global_position.distance_to(fly_pos) > 60.0 and lights[0].get_child(0) is PointLight2D, "Notte: le lucciole si muovono e fanno luce")
+
+	# Sguardo iniziale: a inizio round l'arena è illuminata, poi si spegne.
+	main.start_round()
+	await frames(3)
+	check(main.ambient_light.color.is_equal_approx(arena.intro_ambient), "Notte: a inizio round l'arena e' illuminata per guardarsi intorno")
+	await create_timer(arena.intro_light_time + arena.intro_fade_time * 0.5).timeout
+	var half: float = main.ambient_light.color.get_luminance()
+	await create_timer(arena.intro_fade_time * 0.5 + 0.3).timeout
+	check(half < arena.intro_ambient.get_luminance() - 0.03 and main.ambient_light.color.is_equal_approx(arena.ambient), "Notte: dopo %.0f secondi la luce si spegne piano (a meta %.2f)" % [arena.intro_light_time, half])
+
+	# Buio totale: degli avversari non si vede niente, nemmeno gli occhi.
+	check(not a._eyes.visible and not b._eyes.visible and not arena.eyes_in_dark, "Notte: al buio non si vedono nemmeno gli occhi")
+	# (Gli occhi si possono riaccendere dall'arena, se il buio totale risulta ingiocabile.)
+	arena.eyes_in_dark = true
+	main._start_light()
+	await frames(3)
+	check(a._eyes.visible and a._eyes.material.light_mode == CanvasItemMaterial.LIGHT_MODE_UNSHADED, "Notte: gli occhi si possono riaccendere dall'arena")
+	arena.eyes_in_dark = false
+	main._start_light()
+	main.ambient_light.color = arena.ambient
+	await frames(3)
+	check(not a._eyes.visible, "Notte: e si spengono di nuovo")
+
+	# Chi spara si fa vedere: lampo di luce, e il colpo in volo fa luce.
+	main._spawn_timer = 999.0
+	a.global_position = Vector2(300, 1448)
+	b.global_position = Vector2(650, 1448)
+	a.facing = 1.0
+	a.equip(load("res://src/weapons/crossbow.tres"))
+	await frames(5)
+	check(get_nodes_in_group("flashes").is_empty(), "Notte: senza colpi nessun lampo")
+	Input.action_press("p0_attack")
+	await frames(2)
+	Input.action_release("p0_attack")
+	var flashes: Array = get_nodes_in_group("flashes").filter(func(f): return not f.is_queued_for_deletion())
+	var bolts: Array = get_nodes_in_group("bullets")
+	check(flashes.size() >= 1 and flashes[0].global_position.distance_to(a.global_position) < 80.0, "Notte: sparando parte un lampo di luce su chi spara")
+	check(bolts.size() == 1 and bolts[0].get_children().any(func(c): return c is PointLight2D), "Notte: il colpo in volo fa luce")
+	await frames(12)
+	flashes = get_nodes_in_group("flashes").filter(func(f): return not f.is_queued_for_deletion())
+	check(b.health == 60.0 and flashes.any(func(f): return f.global_position.distance_to(b.global_position) < 80.0), "Notte: chi viene colpito si illumina per un attimo")
+	await frames(60)
+	check(get_nodes_in_group("flashes").filter(func(f): return not f.is_queued_for_deletion()).is_empty(), "Notte: i lampi si spengono da soli")
+	# Anche i pugni fanno un piccolo lampo.
+	a.drop_weapon()
+	await tap("p0_attack")
+	check(get_nodes_in_group("flashes").size() >= 1, "Notte: anche un pugno fa un piccolo lampo")
+	# Le armi a terra fanno luce.
+	var pk = main.spawn_weapon(load("res://src/weapons/knife.tres"), 1600.0)
+	check(pk.get_children().any(func(c): return c is PointLight2D), "Notte: le armi a terra fanno un po' di luce")
+	pk.queue_free()
+	# Si può cadere: bisogna ricordarsi dove finisce la piattaforma.
+	Input.action_press("p0_left")
+	await _wait_for(func(): return not a.alive, 4.0)
+	Input.action_release("p0_left")
+	check(not a.alive, "Notte: un passo falso e si cade nel vuoto")
+	await create_timer(2.8).timeout
+
+	# Passando a un'arena di giorno tutto torna normale.
+	await main.scroll_to_arena(load("res://src/arenas/bosco/radici.tscn"))
+	await frames(5)
+	check(main.ambient_light.color.is_equal_approx(Color.WHITE) and not Arena.night and not a._eyes.visible, "passando a un'arena di giorno torna la luce piena")
+	var day_pk = main.spawn_weapon(load("res://src/weapons/knife.tres"), 1600.0)
+	a.equip(load("res://src/weapons/crossbow.tres"))
+	await tap("p0_attack")
+	check(not day_pk.get_children().any(func(c): return c is PointLight2D) and get_nodes_in_group("flashes").is_empty(), "di giorno niente lampi e niente luci sulle armi")
+	a.drop_weapon()
+	main.scroll_to_arena(load("res://src/arenas/bosco/notte.tscn"))
+	await create_timer(main.scroll_time * 0.5).timeout
+	var mid: float = main.ambient_light.color.get_luminance()
+	await _wait_for(func(): return not main.transitioning, 4.0)
+	await frames(5)
+	check(mid < 0.95 and mid > 0.4 and main.ambient_light.color.is_equal_approx(main.arena.intro_ambient) and Arena.night, "passando a un'arena di notte la luce cala piano (a meta scorrimento %.2f)" % mid)
 
 
 ## Gli oggetti che si muovono devono stare al loro posto anche quando l'arena arriva

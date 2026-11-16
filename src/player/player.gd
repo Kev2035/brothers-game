@@ -110,6 +110,7 @@ var _on_one_way := false
 var riding := false
 ## true quando sono dentro un nascondiglio (cespuglio, zona di buio): non mi si disegna affatto.
 var concealed := false
+var _eyes: Node2D
 var _slide_dir := Vector2.ZERO ## se sto su una piattaforma scivolosa: direzione "in discesa" (sennò zero)
 var _slide_speed := 0.0
 var _free_aim := false ## true se la mira arriva da mouse o levetta destra
@@ -138,6 +139,22 @@ var aim_preview := PackedVector2Array() ## punti della linea tratteggiata (fiond
 func _ready() -> void:
 	add_to_group("players")
 	_recompute_jump()
+	# Gli occhi "al buio": un disegno a parte che non viene scurito dal buio dell'arena.
+	_eyes = Node2D.new()
+	var mat := CanvasItemMaterial.new()
+	mat.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
+	_eyes.material = mat
+	_eyes.visible = false
+	_eyes.draw.connect(_draw_night_eyes)
+	add_child(_eyes)
+
+
+## Nelle arene buie con "eyes_in_dark" acceso, del personaggio si vedono solo gli occhi.
+func _draw_night_eyes() -> void:
+	for e in [-1.0, 1.0]:
+		var eye: Vector2 = BODY + Vector2(facing * 11.0 + e * 9.0, -6.0)
+		_eyes.draw_circle(eye, 6.0, Color(1, 1, 1, 0.85))
+		_eyes.draw_circle(eye + aim * 2.5, 3.0, OUTLINE)
 
 
 ## Ricava gravità e velocità di salto dall'altezza e dal tempo voluti
@@ -310,6 +327,9 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	_read_floor()
 	_update_concealed()
+	_eyes.visible = Arena.night_eyes and not concealed
+	if _eyes.visible:
+		_eyes.queue_redraw()
 
 	if is_on_floor() and not _was_on_floor:
 		_squash = 1.0 # atterraggio: il pupazzetto si schiaccia un attimo
@@ -481,7 +501,15 @@ func _punch() -> void:
 	_punch_queued = 0.0
 	_punch_t = 0.0
 	_punch_dir = aim
+	night_flash(200.0, Color(1.0, 0.95, 0.8), 0.3)
 	melee_hit(punch_range, punch_cone_deg, punch_damage)
+
+
+## Nelle arene buie: un lampo di luce attorno al personaggio (quando colpisce,
+## spara o viene colpito). Di giorno non fa niente.
+func night_flash(radius: float, flash_color: Color, time := 0.2) -> void:
+	if Arena.night:
+		Fx.flash(get_parent(), global_position + BODY, flash_color, radius, time)
 
 
 ## Colpo ravvicinato nella direzione di mira (pugno o arma corpo a corpo):
@@ -529,6 +557,7 @@ func take_hit(direction: Vector2, from_pos: Vector2, damage := 0.0, attacker: Pl
 	if attacker:
 		last_attacker = attacker
 		_last_attacker_timer = 4.0
+	night_flash(240.0, Color(1.0, 0.4, 0.35), 0.45) # al buio chi è colpito si vede per un attimo
 	if damage > 0.0:
 		var real_damage := minf(damage, health) # oltre la vita rimasta non conta
 		health -= real_damage

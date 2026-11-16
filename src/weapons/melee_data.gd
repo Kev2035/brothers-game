@@ -18,6 +18,7 @@ func tick(p: Player, _delta: float, can_act: bool) -> void:
 		p.fire_queued = 0.0
 		p.swing_t = 0.0
 		p.swing_dir = p.aim
+		p.night_flash(230.0, Color(0.9, 0.95, 1.0), 0.3)
 		if p.melee_hit(reach, cone_deg, damage):
 			p.use_ammo() # conta solo se "ammo" è più di 0 (armi che si consumano)
 

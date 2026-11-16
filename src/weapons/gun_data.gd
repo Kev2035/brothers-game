@@ -34,6 +34,7 @@ func fire(p: Player, speed: float) -> void:
 	if muzzle_flash:
 		p.muzzle_flash = 0.06
 	var muzzle := p.shot_origin()
+	p.night_flash(340.0, Color(1.0, 0.9, 0.65), 0.45) # al buio lo sparo fa vedere chi ha sparato
 	for i in pellets:
 		var spread := deg_to_rad(randf_range(-spread_deg, spread_deg) / 2.0)
 		var b := Bullet.new()

@@ -210,6 +210,22 @@ File: `src/arenas/bosco/sottobosco.tscn`; il cespuglio è `src/objects/bush.gd`.
 - *(Aggiunta di Claude)* Quando chi è dentro si muove o colpisce, il **cespuglio si agita**: un indizio per chi guarda con attenzione, così nascondersi non è una vittoria sicura. Stando fermi il cespuglio resta immobile. Si può spegnere cespuglio per cespuglio ("rustle").
 - Lo stesso meccanismo servirà per le zone di buio pesto del livello 9 (gruppo `hide_zones`).
 
+### Livello 9 "Notte fonda": scelte fatte costruendolo (2026-11-16)
+
+File: `src/arenas/bosco/notte.tscn`; `src/objects/light_source.gd` (lucciole e lanterne).
+
+Prima versione (buio leggero, 5 lanterne, 3 lucciole, 3 zone di buio pesto): **superata lo stesso giorno**. Kevin vuole il **buio totale**: si capisce dove si va solo quando passa una lucciola, si capisce dov'è il nemico da dove spara, e bisogna ricordarsi quanto è lunga la piattaforma, perché un passo falso e si cade. Versione attuale:
+
+- **Buio pesto su tutta l'arena**: fuori dalla luce non si vede niente, né piattaforme né personaggi. Niente lanterne e niente zone di buio a parte (è buia tutta l'arena).
+- **5 lucciole** (cerchio di luce di 250 px) che girano larghe facendo un "otto", sempre con lo stesso giro di 10 secondi: insieme, col tempo, passano su tutte le piattaforme.
+- **Sguardo iniziale** *(aggiunta di Claude)*: a inizio round l'arena resta illuminata per 3 secondi, poi la luce si spegne in un secondo e mezzo. Serve a guardarsi intorno e memorizzare le piattaforme.
+- **Gli occhi: spenti** (scelta di Kevin, 2026-11-16: rivelavano troppo l'avversario). Al buio dei personaggi non si vede niente. Si possono riaccendere dall'arena (`eyes_in_dark`) se il buio totale risulta ingiocabile; in quel caso Kevin li vorrebbe visibili solo ogni tanto.
+- **Chi attacca si scopre** *(aggiunta di Claude)*: ogni sparo fa un lampo di luce grande su chi spara (340 px, quasi mezzo secondo); pugni e coltellate un lampo più piccolo (200-230 px, 0,3 s); chi viene colpito si illumina di rosso (240 px, quasi mezzo secondo). Non è un lampo su tutta l'arena: è una luce solo attorno a quel personaggio. (Il lampo che illumina tutta l'arena è quello del temporale, livello 11.) I colpi in volo (frecce, pietre) fanno luce lungo il tragitto.
+- **Le armi a terra sono piccoli fari**: fanno un po' di luce, così si trovano e fanno capire se lì sotto c'è una piattaforma.
+- **Armi**: coltelli, fionde e balestre. Niente asce (scelta di Kevin). Con la fionda a raffica le pietre illuminano la traiettoria.
+- 11 piattaforme di legno su quattro piani, sotto c'è il vuoto. Si parte dalle due piattaforme laterali in basso.
+- Tutto questo (lampi, luci su colpi e armi, occhi) si attiva da solo in qualsiasi arena buia, cioè con la luce d'ambiente (`ambient`) molto scura.
+
 ### Quali armi cadono in quale livello *(proposta di Claude, da bilanciare)*
 
 Le armi dei primi livelli diventano **sempre più rare** salendo, e poi spariscono.

@@ -10,6 +10,19 @@ extends Node2D
 @export var top_margin := 450.0 ## quanto si può salire sopra lo schermo
 @export var death_margin := 250.0 ## quanto sotto il bordo dello schermo si muore
 
+## Luce dell'ambiente: bianco = giorno pieno; un colore scuro = notte (tutto è
+## scurito di quel colore, e si vede bene solo vicino alle fonti di luce).
+@export var ambient := Color.WHITE
+## Nelle arene buie: per quanti secondi, a inizio round, l'arena resta illuminata
+## (con la luce "intro_ambient") prima di spegnersi. Serve a guardarsi intorno e
+## ricordarsi dove sono le piattaforme. 0 = niente sguardo iniziale.
+@export var intro_light_time := 0.0
+@export var intro_ambient := Color(0.32, 0.35, 0.48)
+@export var intro_fade_time := 1.5 ## secondi che la luce ci mette a spegnersi
+## Nelle arene buie: true = dei personaggi si vedono sempre gli occhi (aiuta a
+## sapere dove si è, ma rivela anche gli avversari). false = buio totale.
+@export var eyes_in_dark := false
+
 @export_group("Armi")
 ## false = in questa arena non cade nessuna arma dal cielo.
 @export var sky_weapons_enabled := true
@@ -17,6 +30,22 @@ extends Node2D
 ## spesso esce; es. fionda 3 e coltello 1 = tre fionde ogni coltello).
 ## Vuoto = le armi di base del gioco.
 @export var sky_weapons: Dictionary[WeaponData, float] = {}
+
+## true mentre si gioca in un'arena buia: colpi, proiettili e armi a terra fanno luce.
+static var night := false
+## true se in questa arena buia si devono vedere gli occhi dei personaggi.
+static var night_eyes := false
+
+
+## Arena buia? (Luce d'ambiente molto scura.)
+func is_dark() -> bool:
+	return ambient.get_luminance() < 0.3
+
+
+## La luce con cui comincia il round (quella dello sguardo iniziale, se c'è).
+func start_ambient() -> Color:
+	return intro_ambient if intro_light_time > 0.0 else ambient
+
 
 ## L'area inquadrata nel "mondo" (tiene conto di dove si trova l'arena:
 ## durante il cambio di arena quella nuova sta accanto a quella vecchia).

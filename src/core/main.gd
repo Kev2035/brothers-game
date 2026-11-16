@@ -35,6 +35,7 @@ const ARENA_PATHS: Array[String] = [
 	"res://src/arenas/bosco/oblique.tscn",
 	"res://src/arenas/bosco/ascensori.tscn",
 	"res://src/arenas/bosco/sottobosco.tscn",
+	"res://src/arenas/bosco/notte.tscn",
 	"res://src/arenas/test_arena/test_arena.tscn",
 	"res://src/arenas/torri/torri.tscn",
 	"res://src/arenas/ponti/ponti.tscn",
@@ -119,6 +120,8 @@ var _joined := {} # "kb_a" / "kb_b" / "joy_0" ... -> slot
 var _banner: Label
 var camera: Camera2D
 var pause_menu: PauseMenu
+var ambient_light: CanvasModulate ## scurisce tutto il gioco nelle arene di notte (vedi Arena.ambient)
+var _light_tween: Tween
 
 
 func _ready() -> void:
@@ -127,6 +130,8 @@ func _ready() -> void:
 	camera = Camera2D.new()
 	add_child(camera)
 	camera.make_current()
+	ambient_light = CanvasModulate.new()
+	add_child(ambient_light)
 	_banner = Label.new()
 	_banner.position = Vector2(0, 400)
 	_banner.size = Vector2(1920, 160)
@@ -201,6 +206,9 @@ func scroll_to_arena(scene: PackedScene) -> void:
 	var tw := create_tween().set_parallel().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tw.tween_property(camera, "position", next_arena.world_bounds.get_center(), scroll_time)
 	tw.tween_property(camera, "zoom", _zoom_for(next_arena), scroll_time)
+	if _light_tween != null:
+		_light_tween.kill()
+	tw.tween_property(ambient_light, "color", next_arena.start_ambient(), scroll_time) # la luce cambia piano durante lo scorrimento
 	await tw.finished
 
 	# Via l'arena vecchia. Quella nuova torna al punto (0, 0) insieme alla telecamera:
@@ -562,7 +570,22 @@ func start_round() -> void:
 	var spawns := arena.spawn_points()
 	for p in participants():
 		p.respawn(spawns[p.slot])
+	_start_light()
 	_update_hud()
+
+
+## La luce dell'arena a inizio round. Nelle arene buie con lo "sguardo iniziale"
+## si parte illuminati per qualche secondo, poi la luce si spegne piano.
+func _start_light() -> void:
+	if _light_tween != null:
+		_light_tween.kill()
+	Arena.night = arena.is_dark()
+	Arena.night_eyes = Arena.night and arena.eyes_in_dark
+	ambient_light.color = arena.start_ambient()
+	if arena.intro_light_time > 0.0:
+		_light_tween = create_tween()
+		_light_tween.tween_interval(arena.intro_light_time)
+		_light_tween.tween_property(ambient_light, "color", arena.ambient, arena.intro_fade_time)
 
 
 func _physics_process(delta: float) -> void:

@@ -21,6 +21,8 @@ var _travelled := 0.0
 func _ready() -> void:
 	add_to_group("round_temp")
 	add_to_group("bullets")
+	if Arena.night:
+		add_child(Fx.make_light(120.0, color, 0.9)) # al buio i colpi in volo fanno luce
 
 
 func _physics_process(delta: float) -> void:
