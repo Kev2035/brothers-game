@@ -15,6 +15,12 @@ Impianto completo (Godot 4.7.2, 20 skill, stile a pupazzetti con animazione a pe
   (prima, dopo aver aggiunto file nuovi, lanciare lo stesso comando con `--import` al posto di `--script ...`). Va aggiornato a ogni modifica.
 - **Modo di lavorare che funziona**: Claude costruisce → test automatico + screenshot reale → Kevin prova e dà feedback → ritocchi → ok di Kevin → commit + STATO.md.
 
+### GitHub e secondo PC (2026-11-17)
+- Repository **privato**: https://github.com/Kev2035/brothers-game (ramo `master`). Il comando `gh` di questo PC è collegato all'account Kev2035.
+- **Su un altro PC** (serve Git + Godot 4.7.2): una volta sola `git clone https://github.com/Kev2035/brothers-game.git`, poi in Godot Importa → `project.godot`. Per avere l'ultima versione: `git pull` nella cartella, riaprire Godot, F5.
+- Da questo PC, dopo ogni commit, serve `git push` per far arrivare le novità su GitHub (lo fa Claude quando Kevin lo chiede).
+- L'`.exe` esportato resta per più avanti (per chi non ha Godot).
+
 ### Workflow del progetto (concordato il 2026-11-11)
 Ogni tappa funziona così: Claude costruisce → Kevin prova → feedback e ritocchi → Kevin approva → commit e aggiornamento di STATO.md.
 1. **Prototipo movimento** (cerchi colorati): corsa, salto, doppio salto, piattaforme, pugno con mira a 360°, scudo, salto dai muri, cadute. ✅
