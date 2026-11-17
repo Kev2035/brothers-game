@@ -1,0 +1,168 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://src/arenas/arena.gd" id="arena"]
+[ext_resource type="Script" path="res://src/objects/platform.gd" id="platform"]
+[ext_resource type="Script" path="res://src/weapons/weapon_data.gd" id="wdata"]
+[ext_resource type="Resource" path="res://src/weapons/knife.tres" id="knife"]
+[ext_resource type="Resource" path="res://src/weapons/axe.tres" id="axe"]
+[ext_resource type="Resource" path="res://src/weapons/crossbow.tres" id="crossbow"]
+[ext_resource type="Script" path="res://src/objects/storm.gd" id="storm"]
+[ext_resource type="Script" path="res://src/objects/flex_branch.gd" id="flex"]
+
+[node name="Alba" type="Node2D"]
+script = ExtResource("arena")
+arena_name = "L'alba"
+bounds = Rect2(0, 0, 3200, 1800)
+ambient = Color(0.9, 0.82, 0.86, 1)
+sky_weapons = Dictionary[ExtResource("wdata"), float]({
+ExtResource("knife"): 2.0,
+ExtResource("axe"): 2.0,
+ExtResource("crossbow"): 1.5
+})
+
+[node name="Background" type="ColorRect" parent="."]
+offset_left = -1000.0
+offset_top = -1000.0
+offset_right = 4200.0
+offset_bottom = 2800.0
+mouse_filter = 2
+color = Color(0.93, 0.6, 0.5, 1)
+
+[node name="Decor" type="Node2D" parent="."]
+z_index = -5
+
+[node name="SkyLow" type="ColorRect" parent="Decor"]
+offset_left = -1000.0
+offset_top = 1100.0
+offset_right = 4200.0
+offset_bottom = 2800.0
+mouse_filter = 2
+color = Color(0.98, 0.76, 0.5, 1)
+
+[node name="Sun" type="Polygon2D" parent="Decor"]
+color = Color(1.0, 0.9, 0.6, 1)
+polygon = PackedVector2Array(1860, 1500, 1847, 1580, 1810, 1653, 1753, 1710, 1680, 1747, 1600, 1760, 1520, 1747, 1447, 1710, 1390, 1653, 1353, 1580, 1340, 1500, 1353, 1420, 1390, 1347, 1447, 1290, 1520, 1253, 1600, 1240, 1680, 1253, 1753, 1290, 1810, 1347, 1847, 1420)
+
+[node name="Trunk1" type="ColorRect" parent="Decor"]
+offset_left = 150.0
+offset_top = -1000.0
+offset_right = 410.0
+offset_bottom = 2800.0
+mouse_filter = 2
+color = Color(0.36, 0.26, 0.2, 1)
+
+[node name="Trunk2" type="ColorRect" parent="Decor"]
+offset_left = 1030.0
+offset_top = -1000.0
+offset_right = 1290.0
+offset_bottom = 2800.0
+mouse_filter = 2
+color = Color(0.36, 0.26, 0.2, 1)
+
+[node name="Trunk3" type="ColorRect" parent="Decor"]
+offset_left = 1900.0
+offset_top = -1000.0
+offset_right = 2160.0
+offset_bottom = 2800.0
+mouse_filter = 2
+color = Color(0.36, 0.26, 0.2, 1)
+
+[node name="Trunk4" type="ColorRect" parent="Decor"]
+offset_left = 2790.0
+offset_top = -1000.0
+offset_right = 3050.0
+offset_bottom = 2800.0
+mouse_filter = 2
+color = Color(0.36, 0.26, 0.2, 1)
+
+[node name="Platforms" type="Node2D" parent="."]
+
+
+[node name="StartLeft" type="StaticBody2D" parent="Platforms"]
+position = Vector2(100, 1450)
+script = ExtResource("platform")
+size = Vector2(450, 40)
+color = Color(0.4, 0.3, 0.2, 1)
+
+[node name="StartRight" type="StaticBody2D" parent="Platforms"]
+position = Vector2(2650, 1450)
+script = ExtResource("platform")
+size = Vector2(450, 40)
+color = Color(0.4, 0.3, 0.2, 1)
+
+[node name="WetLeft" type="StaticBody2D" parent="Platforms"]
+position = Vector2(300, 1050)
+script = ExtResource("platform")
+size = Vector2(430, 24)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+wet = true
+
+[node name="WetRight" type="StaticBody2D" parent="Platforms"]
+position = Vector2(2470, 1050)
+script = ExtResource("platform")
+size = Vector2(430, 24)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+wet = true
+
+[node name="Top" type="StaticBody2D" parent="Platforms"]
+position = Vector2(1350, 600)
+script = ExtResource("platform")
+size = Vector2(500, 24)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+
+[node name="BranchLeft" type="AnimatableBody2D" parent="Platforms"]
+position = Vector2(690, 1260)
+script = ExtResource("flex")
+size = Vector2(360, 22)
+anchor_right = true
+
+[node name="BranchRight" type="AnimatableBody2D" parent="Platforms"]
+position = Vector2(2150, 1260)
+script = ExtResource("flex")
+size = Vector2(360, 22)
+
+[node name="BranchCenterLeft" type="AnimatableBody2D" parent="Platforms"]
+position = Vector2(1180, 1040)
+script = ExtResource("flex")
+size = Vector2(360, 22)
+
+[node name="BranchCenterRight" type="AnimatableBody2D" parent="Platforms"]
+position = Vector2(1660, 1040)
+script = ExtResource("flex")
+size = Vector2(360, 22)
+anchor_right = true
+
+[node name="BranchHighLeft" type="AnimatableBody2D" parent="Platforms"]
+position = Vector2(690, 800)
+script = ExtResource("flex")
+size = Vector2(360, 22)
+anchor_right = true
+
+[node name="BranchHighRight" type="AnimatableBody2D" parent="Platforms"]
+position = Vector2(2150, 800)
+script = ExtResource("flex")
+size = Vector2(360, 22)
+
+[node name="Storm" type="Node2D" parent="."]
+script = ExtResource("storm")
+rain_drops = 45
+rain_color = Color(0.85, 0.9, 1, 0.3)
+lightning = false
+
+[node name="Spawns" type="Node2D" parent="."]
+
+
+[node name="Spawn1" type="Marker2D" parent="Spawns"]
+position = Vector2(250, 1448)
+
+[node name="Spawn2" type="Marker2D" parent="Spawns"]
+position = Vector2(2950, 1448)
+
+[node name="Spawn3" type="Marker2D" parent="Spawns"]
+position = Vector2(420, 1448)
+
+[node name="Spawn4" type="Marker2D" parent="Spawns"]
+position = Vector2(2780, 1448)

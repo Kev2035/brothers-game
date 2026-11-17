@@ -1,0 +1,205 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://src/arenas/arena.gd" id="arena"]
+[ext_resource type="Script" path="res://src/objects/platform.gd" id="platform"]
+[ext_resource type="Script" path="res://src/weapons/weapon_data.gd" id="wdata"]
+[ext_resource type="Resource" path="res://src/weapons/knife.tres" id="knife"]
+[ext_resource type="Resource" path="res://src/weapons/axe.tres" id="axe"]
+[ext_resource type="Resource" path="res://src/weapons/crossbow.tres" id="crossbow"]
+[ext_resource type="Script" path="res://src/objects/crow_thief.gd" id="crow"]
+
+[node name="Corvi" type="Node2D"]
+script = ExtResource("arena")
+arena_name = "I corvi ladri"
+bounds = Rect2(0, 0, 3200, 1800)
+ambient = Color(0.5, 0.54, 0.72, 1)
+sky_weapons = Dictionary[ExtResource("wdata"), float]({
+ExtResource("knife"): 2.0,
+ExtResource("axe"): 2.0,
+ExtResource("crossbow"): 1.5
+})
+
+[node name="Background" type="ColorRect" parent="."]
+offset_left = -1000.0
+offset_top = -1000.0
+offset_right = 4200.0
+offset_bottom = 2800.0
+mouse_filter = 2
+color = Color(0.1, 0.13, 0.26, 1)
+
+[node name="Decor" type="Node2D" parent="."]
+z_index = -5
+
+[node name="Moon" type="Polygon2D" parent="Decor"]
+color = Color(0.92, 0.93, 0.85, 1)
+polygon = PackedVector2Array(2650, 330, 2643, 376, 2621, 418, 2588, 451, 2546, 473, 2500, 480, 2454, 473, 2412, 451, 2379, 418, 2357, 376, 2350, 330, 2357, 284, 2379, 242, 2412, 209, 2454, 187, 2500, 180, 2546, 187, 2588, 209, 2621, 242, 2643, 284)
+
+[node name="Trunk1" type="ColorRect" parent="Decor"]
+offset_left = 200.0
+offset_top = -1000.0
+offset_right = 460.0
+offset_bottom = 2800.0
+mouse_filter = 2
+color = Color(0.2, 0.16, 0.16, 1)
+
+[node name="Trunk2" type="ColorRect" parent="Decor"]
+offset_left = 880.0
+offset_top = -1000.0
+offset_right = 1140.0
+offset_bottom = 2800.0
+mouse_filter = 2
+color = Color(0.2, 0.16, 0.16, 1)
+
+[node name="Trunk3" type="ColorRect" parent="Decor"]
+offset_left = 1470.0
+offset_top = -1000.0
+offset_right = 1730.0
+offset_bottom = 2800.0
+mouse_filter = 2
+color = Color(0.2, 0.16, 0.16, 1)
+
+[node name="Trunk4" type="ColorRect" parent="Decor"]
+offset_left = 2060.0
+offset_top = -1000.0
+offset_right = 2320.0
+offset_bottom = 2800.0
+mouse_filter = 2
+color = Color(0.2, 0.16, 0.16, 1)
+
+[node name="Trunk5" type="ColorRect" parent="Decor"]
+offset_left = 2740.0
+offset_top = -1000.0
+offset_right = 3000.0
+offset_bottom = 2800.0
+mouse_filter = 2
+color = Color(0.2, 0.16, 0.16, 1)
+
+[node name="Perch1" type="ColorRect" parent="Decor"]
+offset_left = 640.0
+offset_top = 196.0
+offset_right = 960.0
+offset_bottom = 214.0
+mouse_filter = 2
+color = Color(0.26, 0.2, 0.17, 1)
+
+[node name="Perch2" type="ColorRect" parent="Decor"]
+offset_left = 1440.0
+offset_top = 196.0
+offset_right = 1760.0
+offset_bottom = 214.0
+mouse_filter = 2
+color = Color(0.26, 0.2, 0.17, 1)
+
+[node name="Perch3" type="ColorRect" parent="Decor"]
+offset_left = 2240.0
+offset_top = 196.0
+offset_right = 2560.0
+offset_bottom = 214.0
+mouse_filter = 2
+color = Color(0.26, 0.2, 0.17, 1)
+
+[node name="Platforms" type="Node2D" parent="."]
+
+
+[node name="StartLeft" type="StaticBody2D" parent="Platforms"]
+position = Vector2(100, 1450)
+script = ExtResource("platform")
+size = Vector2(500, 40)
+color = Color(0.4, 0.3, 0.2, 1)
+
+[node name="StartRight" type="StaticBody2D" parent="Platforms"]
+position = Vector2(2600, 1450)
+script = ExtResource("platform")
+size = Vector2(500, 40)
+color = Color(0.4, 0.3, 0.2, 1)
+
+[node name="LowMid" type="StaticBody2D" parent="Platforms"]
+position = Vector2(1250, 1350)
+script = ExtResource("platform")
+size = Vector2(700, 24)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+
+[node name="MidLeft" type="StaticBody2D" parent="Platforms"]
+position = Vector2(650, 1120)
+script = ExtResource("platform")
+size = Vector2(450, 24)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+
+[node name="MidRight" type="StaticBody2D" parent="Platforms"]
+position = Vector2(2100, 1120)
+script = ExtResource("platform")
+size = Vector2(450, 24)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+
+[node name="Center" type="StaticBody2D" parent="Platforms"]
+position = Vector2(1350, 900)
+script = ExtResource("platform")
+size = Vector2(500, 40)
+color = Color(0.4, 0.3, 0.2, 1)
+
+[node name="HighLeft" type="StaticBody2D" parent="Platforms"]
+position = Vector2(250, 820)
+script = ExtResource("platform")
+size = Vector2(400, 24)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+
+[node name="HighRight" type="StaticBody2D" parent="Platforms"]
+position = Vector2(2550, 820)
+script = ExtResource("platform")
+size = Vector2(400, 24)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+
+[node name="TopLeft" type="StaticBody2D" parent="Platforms"]
+position = Vector2(900, 620)
+script = ExtResource("platform")
+size = Vector2(400, 24)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+
+[node name="TopRight" type="StaticBody2D" parent="Platforms"]
+position = Vector2(1900, 620)
+script = ExtResource("platform")
+size = Vector2(400, 24)
+one_way = true
+color = Color(0.6, 0.44, 0.26, 1)
+
+[node name="Crows" type="Node2D" parent="."]
+
+
+[node name="Crow1" type="Node2D" parent="Crows"]
+position = Vector2(800, 165)
+script = ExtResource("crow")
+first_delay = 4.0
+interval = Vector2(7, 11)
+
+[node name="Crow2" type="Node2D" parent="Crows"]
+position = Vector2(1600, 165)
+script = ExtResource("crow")
+first_delay = 7.0
+interval = Vector2(7, 11)
+
+[node name="Crow3" type="Node2D" parent="Crows"]
+position = Vector2(2400, 165)
+script = ExtResource("crow")
+first_delay = 10.0
+interval = Vector2(7, 11)
+
+[node name="Spawns" type="Node2D" parent="."]
+
+
+[node name="Spawn1" type="Marker2D" parent="Spawns"]
+position = Vector2(250, 1448)
+
+[node name="Spawn2" type="Marker2D" parent="Spawns"]
+position = Vector2(2950, 1448)
+
+[node name="Spawn3" type="Marker2D" parent="Spawns"]
+position = Vector2(450, 1448)
+
+[node name="Spawn4" type="Marker2D" parent="Spawns"]
+position = Vector2(2750, 1448)

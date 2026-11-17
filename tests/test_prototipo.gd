@@ -549,6 +549,7 @@ func _run() -> void:
 	await _test_sottobosco()
 	await _test_notte()
 	await _test_buio_varianti()
+	await _test_bosco_finale()
 	await _test_scorrimento_oggetti()
 	await _test_lobby_e_partita()
 	await _test_menu_pausa()
@@ -1883,3 +1884,357 @@ func _test_scorrimento_oggetti() -> void:
 	check(not paused and main.arena.arena_name == "Ascensori e scivoli" and a.alive, "scegliendo un livello ci si va subito")
 	var el2: Elevator = main.arena.get_node("Platforms/ElevatorLeft")
 	check(absf(el2.global_position.x - 150.0) < 2.0, "anche scegliendo il livello gli ascensori sono al loro posto")
+
+
+## Blocchi D ed E del bosco: livelli 13 (corvi ladri), 14 (tempesta), 15 (alba),
+## 16 (la chioma e il nido, spada di Re Artù) e 17 (il corvo gigante).
+func _test_bosco_finale() -> void:
+	const FOREST := ["knife", "axe", "crossbow"]
+	var KNIFE: WeaponData = load("res://src/weapons/knife.tres")
+	var AXE: WeaponData = load("res://src/weapons/axe.tres")
+	var EXCALIBUR: WeaponData = load("res://src/weapons/excalibur.tres")
+	var P: Array = main.ARENA_PATHS
+	check(P[12].ends_with("corvi.tscn") and P[13].ends_with("tempesta.tscn") and P[14].ends_with("alba.tscn")
+			and P[15].ends_with("nido.tscn") and P[16].ends_with("corvo_gigante.tscn"), "i livelli 13-17 del bosco vengono dopo il 12")
+
+	# ---------- Livello 13: I corvi ladri ----------
+	var pl: Array = await _open_arena("res://src/arenas/bosco/corvi.tscn")
+	var a = pl[0]
+	var b = pl[1]
+	check(main.arena.arena_name == "I corvi ladri" and a.is_on_floor() and b.is_on_floor() and not Arena.night, "Corvi: si parte in piedi, di notte ma con la luna (si vede)")
+	check(await _only_weapons(FOREST), "Corvi: cadono coltelli, asce e balestre")
+	var crows: Array = get_nodes_in_group("crows")
+	check(crows.size() == 3, "Corvi: tre corvi appollaiati (%d)" % crows.size())
+	var c1: CrowThief = main.arena.get_node("Crows/Crow1")
+	for c in crows:
+		c._timer = 999.0
+	# Nessuno ha un'arma: il corvo non parte.
+	c1._timer = 0.0
+	await frames(30)
+	check(c1.state == CrowThief.State.PERCH and c1.position.distance_to(c1._home) < 1.0, "Corvi: senza armi in giro il corvo resta appollaiato")
+	# Ruba l'arma dalle mani, senza fare danno.
+	a.equip(KNIFE)
+	c1._timer = 0.0
+	await frames(10)
+	check(c1.state == CrowThief.State.WARN, "Corvi: prima di partire il corvo avvisa")
+	await _wait_for(func(): return c1.steals > 0, 6.0)
+	check(a.weapon == null and c1.steals == 1 and c1.carried == KNIFE, "Corvi: il corvo ruba l'arma dalle mani")
+	check(is_equal_approx(a.health, a.max_health) and a.alive, "Corvi: il corvo non fa danno")
+	await _wait_for(func(): return c1.state == CrowThief.State.PERCH, 8.0)
+	check(c1.carried == null and c1.position.distance_to(c1._home) < 6.0, "Corvi: vola via con l'arma e poi torna al suo posto")
+	# Ruba anche le armi a terra.
+	c1._timer = 999.0
+	main.spawn_weapon(AXE, 350.0)
+	await frames(150)
+	check(get_nodes_in_group("pickups").size() == 1, "Corvi: c'e' un'arma a terra")
+	var c2: CrowThief = main.arena.get_node("Crows/Crow2")
+	c2._timer = 0.0
+	await _wait_for(func(): return c2.steals > 0, 6.0)
+	await frames(3)
+	check(c2.steals == 1 and get_nodes_in_group("pickups").is_empty() and c2.carried == AXE, "Corvi: il corvo ruba anche le armi a terra")
+	# Chi lascia l'arma in tempo fa tornare su il corvo a zampe vuote.
+	await _wait_for(func(): return c2.state == CrowThief.State.PERCH, 8.0)
+	b.equip(KNIFE)
+	c2._timer = 0.0
+	await _wait_for(func(): return c2.state == CrowThief.State.DIVE, 3.0)
+	b.drop_weapon()
+	await frames(5)
+	check(c2.state != CrowThief.State.DIVE and c2.carried == null and c2.steals == 1, "Corvi: se il bersaglio non ha piu' l'arma il corvo torna su")
+	main.start_round()
+	await frames(3)
+	check(c2.position.distance_to(c2._home) < 1.0 and c2.state == CrowThief.State.PERCH and c2.steals == 0, "Corvi: a ogni round i corvi ripartono dal loro posto")
+
+	# ---------- Livello 14: La tempesta ----------
+	pl = await _open_arena("res://src/arenas/bosco/tempesta.tscn")
+	a = pl[0]
+	b = pl[1]
+	var storm: Storm = main.arena.get_node("Storm")
+	check(main.arena.arena_name == "La tempesta" and a.is_on_floor() and b.is_on_floor() and Arena.night, "Tempesta: si parte in piedi, al buio")
+	check(await _only_weapons(FOREST), "Tempesta: cadono coltelli, asce e balestre")
+	check(get_nodes_in_group("crows").size() == 0 and get_nodes_in_group("wet").size() == 4, "Tempesta: niente corvi e quattro piattaforme bagnate")
+	storm._timer = 999.0
+	# Durante lo sguardo iniziale niente lampi.
+	storm.strike()
+	check(storm.lightnings == 0, "Tempesta: niente lampi durante lo sguardo iniziale")
+	# Sull'asciutto ci si ferma, sul bagnato no.
+	Input.action_press("p0_right")
+	await frames(15)
+	Input.action_release("p0_right")
+	await frames(20)
+	check(absf(a.velocity.x) < 5.0, "Tempesta: sull'asciutto lasciando il tasto ci si ferma")
+	a.global_position = Vector2(1350, 998) # sulla piattaforma bagnata al centro (1250-1950)
+	a.velocity = Vector2.ZERO
+	await frames(10)
+	check(a.is_on_floor() and a._on_wet and absf(a.velocity.x) < 1.0, "Tempesta: fermi sul bagnato si resta fermi")
+	Input.action_press("p0_right")
+	await frames(14)
+	Input.action_release("p0_right")
+	var wet_v: float = a.velocity.x
+	await frames(12)
+	print("    sul bagnato: velocita' %.0f -> %.0f px/s" % [wet_v, a.velocity.x])
+	check(a.is_on_floor() and a.velocity.x >= a.wet_min_speed - 1.0 and a.velocity.x >= wet_v - 1.0, "Tempesta: sul bagnato si continua a scivolare")
+	Input.action_press("p0_left")
+	await frames(10)
+	Input.action_release("p0_left")
+	check(a.velocity.x >= a.wet_min_speed - 1.0, "Tempesta: sul bagnato non si frena e non si torna indietro")
+	await tap("p0_jump", 6)
+	await frames(3)
+	check(not a.is_on_floor() and a.velocity.y < 0.0, "Tempesta: dal bagnato si esce saltando")
+	a.global_position = Vector2(1350, 998)
+	a.velocity = Vector2(500, 0)
+	await _wait_for(func(): return not a.alive or a.global_position.x > 1990.0, 4.0)
+	check(a.global_position.x > 1990.0 or not a.alive, "Tempesta: chi non salta scivola fino in fondo e cade dalla piattaforma")
+	# Il lampo: la luce sale (ma non e' bianco pieno), lo schermo trema, poi torna buio.
+	main.start_round()
+	await _wait_for(func(): return main.ambient_light.color.is_equal_approx(main.arena.ambient), 6.0)
+	await frames(5)
+	storm._timer = 999.0
+	storm.strike()
+	await frames(3)
+	var lit: Color = main.ambient_light.color
+	print("    luce durante il lampo: %.2f (buio: %.2f)" % [lit.get_luminance(), main.arena.ambient.get_luminance()])
+	check(storm.lightnings == 1 and lit.get_luminance() > 0.4 and lit.get_luminance() < 0.8, "Tempesta: il lampo illumina tutta l'arena, attenuato")
+	check(main.camera.offset.length() > 0.1, "Tempesta: col lampo trema lo schermo")
+	var ax: float = a.global_position.x
+	await frames(110)
+	check(main.ambient_light.color.is_equal_approx(main.arena.ambient) and main.camera.offset.length() < 0.01, "Tempesta: dopo il lampo torna il buio e lo schermo e' fermo")
+	check(absf(a.global_position.x - ax) < 1.0 and a.is_on_floor(), "Tempesta: il lampo e' solo scena, non sposta nessuno")
+
+	# ---------- Livello 15: L'alba ----------
+	pl = await _open_arena("res://src/arenas/bosco/alba.tscn")
+	a = pl[0]
+	b = pl[1]
+	check(main.arena.arena_name == "L'alba" and a.is_on_floor() and b.is_on_floor() and not Arena.night, "Alba: si parte in piedi, con la luce")
+	check(await _only_weapons(FOREST), "Alba: cadono coltelli, asce e balestre")
+	var rain: Storm = main.arena.get_node("Storm")
+	var branches: Array = get_nodes_in_group("round_reset").filter(func(n): return n is FlexBranch)
+	check(not rain.lightning and branches.size() == 6 and get_nodes_in_group("wet").size() == 2, "Alba: pioggia senza lampi, sei rami flessibili, due piattaforme ancora bagnate")
+	var br: FlexBranch = main.arena.get_node("Platforms/BranchLeft") # a riposo: x 690-1050, y 1260
+	a.global_position = Vector2(870, 1258)
+	a.velocity = Vector2.ZERO
+	await frames(20)
+	check(a.is_on_floor() and br.riders() == 1 and br.sag > 10.0, "Alba: il ramo comincia a piegarsi sotto il peso")
+	await frames(90)
+	print("    ramo con un personaggio: sceso di %.0f px, piedi a y=%.0f" % [br.sag, a.global_position.y])
+	check(is_equal_approx(br.sag, br.sag_per_player) and a.is_on_floor() and absf(a.global_position.y - (1260.0 + br.sag)) < 6.0, "Alba: con un personaggio il ramo scende e lo porta giu' con se'")
+	b.global_position = Vector2(960, a.global_position.y - 2.0)
+	b.velocity = Vector2.ZERO
+	await frames(90)
+	check(is_equal_approx(br.sag, br.max_sag) and a.is_on_floor() and b.is_on_floor(), "Alba: in due il ramo scende di piu' (%.0f px)" % br.sag)
+	a.global_position = Vector2(250, 1448)
+	b.global_position = Vector2(420, 1448)
+	await frames(40)
+	check(is_zero_approx(br.sag) and absf(br.position.y - 1260.0) < 0.5, "Alba: rimasto vuoto il ramo torna su di scatto")
+	# Arrivandoci con lo scorrimento i rami sono al loro posto.
+	await main.scroll_to_arena(load("res://src/arenas/bosco/alba.tscn"))
+	await frames(20)
+	br = main.arena.get_node("Platforms/BranchLeft")
+	check(absf(br.global_position.x - 690.0) < 1.0 and absf(br.global_position.y - 1260.0) < 1.0, "Alba: dopo lo scorrimento i rami sono al loro posto")
+	a.global_position = Vector2(870, 1258)
+	a.velocity = Vector2.ZERO
+	await frames(30)
+	check(a.is_on_floor() and br.sag > 10.0, "Alba: dopo lo scorrimento sul ramo ci si sta sopra e si piega")
+
+	# ---------- Livello 16: La chioma e il nido ----------
+	pl = await _open_arena("res://src/arenas/bosco/nido.tscn")
+	a = pl[0]
+	b = pl[1]
+	var stone: SwordStone = main.arena.get_node("SwordStone")
+	check(main.arena.arena_name == "La chioma e il nido" and a.is_on_floor() and b.is_on_floor() and not main.arena.sky_weapons_enabled, "Nido: si parte in piedi e non cadono armi")
+	b.global_position = Vector2(3300, 1558)
+	b.velocity = Vector2(900, 0)
+	await frames(120)
+	check(b.alive and b.is_on_floor() and b.global_position.y < 1570.0, "Nido: in questo livello non si puo' cadere nel vuoto")
+	check(stone.has_sword and stone.weapon == EXCALIBUR, "Nido: la spada di Re Artu' e' nella roccia")
+	# Per estrarla bisogna tenere premuto: un tocco non basta.
+	a.global_position = Vector2(2630, 738)
+	a.velocity = Vector2.ZERO
+	a.facing = 1.0
+	await frames(10)
+	check(a.is_on_floor() and a.weapon == null and stone.has_sword, "Nido: passarci accanto non basta per prendere la spada")
+	Input.action_press("p0_attack")
+	await frames(25)
+	check(stone.puller == a and stone.progress > 0.3 and a.weapon == null, "Nido: tenendo premuto si comincia a estrarla (%.2f)" % stone.progress)
+	Input.action_release("p0_attack")
+	await frames(3)
+	check(stone.progress == 0.0 and stone.puller == null and stone.has_sword, "Nido: lasciando il tasto si ricomincia da capo")
+	# Chi viene colpito mentre la estrae deve ricominciare.
+	Input.action_press("p0_attack")
+	await frames(30)
+	a.take_hit(Vector2.RIGHT, a.global_position + Vector2(-80, -50), 10.0, b)
+	await frames(2)
+	check(stone.progress < 0.1 and a.weapon == null, "Nido: un colpo interrompe chi la sta estraendo")
+	await frames(70)
+	Input.action_release("p0_attack")
+	check(a.weapon == EXCALIBUR and not stone.has_sword, "Nido: tenendo premuto circa un secondo la spada e' tua")
+	# Non si lascia.
+	await tap("p0_drop")
+	await frames(5)
+	check(a.weapon == EXCALIBUR and get_nodes_in_group("pickups").is_empty(), "Spada di Re Artu': non si puo' lasciare")
+	# Lama volante: 34 di danno da lontano.
+	a.global_position = Vector2(2400, 738)
+	b.global_position = Vector2(3000, 738)
+	a.facing = 1.0
+	await frames(8)
+	await tap("p0_attack")
+	await frames(2)
+	var blades: Array = get_nodes_in_group("bullets")
+	check(blades.size() == 1 and blades[0].blade, "Spada di Re Artu': ogni colpo lancia una lama volante")
+	await frames(40)
+	check(is_equal_approx(b.health, 100.0 - 34.0), "Spada di Re Artu': la lama volante toglie 34 (vita di B: %.0f)" % b.health)
+	# Scudo tutto intorno: para anche i colpi alle spalle.
+	a.global_position = Vector2(2600, 738)
+	b.global_position = Vector2(2520, 738)
+	a.facing = 1.0
+	b.facing = 1.0
+	await frames(5)
+	await tap("p0_shield")
+	await frames(6)
+	check(is_equal_approx(a.shield_half_angle(), 180.0), "Spada di Re Artu': lo scudo copre tutto intorno")
+	var before: float = a.health
+	await tap("p1_attack")
+	await frames(8)
+	check(is_equal_approx(a.health, before), "Spada di Re Artu': lo scudo para anche i colpi alle spalle")
+	await frames(40)
+	check(a.is_shielding() and a.shield_half_angle() < 150.0 and a.shield_half_angle() > 0.0, "Spada di Re Artu': poi lo scudo si restringe (%.0f gradi)" % a.shield_half_angle())
+	await frames(40)
+	check(not a.is_shielding(), "Spada di Re Artu': e alla fine sparisce")
+	# Colpo diretto: uccide in un colpo. Chi vince con la spada in mano diventa "il re".
+	a.global_position = Vector2(2600, 738)
+	b.global_position = Vector2(2700, 738)
+	a.facing = 1.0
+	await frames(5)
+	await tap("p0_attack")
+	await frames(5)
+	check(not b.alive and main.round_over, "Spada di Re Artu': il colpo diretto uccide in un colpo")
+	check(main.king_slot == a.slot, "Nido: chi vince con la spada se la porta nel livello dopo")
+
+	# Dal nido al boss con lo scorrimento: il re arriva con la spada, la roccia e' vuota.
+	await main.scroll_to_arena(load("res://src/arenas/bosco/corvo_gigante.tscn"))
+	await frames(20)
+	var boss: GiantCrow = main.arena.get_node("GiantCrow")
+	var stone2: SwordStone = main.arena.get_node("SwordStone")
+	check(main.arena.arena_name == "Il corvo gigante" and a.weapon == EXCALIBUR and b.weapon == null, "Boss: chi ha vinto il nido arriva con la spada di Re Artu'")
+	check(not stone2.has_sword, "Boss: se qualcuno ha gia' la spada, la roccia e' vuota")
+	check(absf(boss.global_position.x - 1600.0) < boss.far_drift + 5.0 and boss.global_position.y < 500.0, "Boss: dopo lo scorrimento il corvo gigante e' al suo posto")
+	# Se chi ha la spada muore, la spada resta a terra per gli altri.
+	a.global_position = Vector2(1200, 1298)
+	await frames(10)
+	a._die("hp")
+	await frames(5)
+	var left: Array = get_nodes_in_group("pickups")
+	check(left.size() == 1 and left[0].data == EXCALIBUR and not main.round_over, "Boss: se muore chi ha la spada, la spada cade a terra e il round continua")
+	b.global_position = Vector2(1200, 1298)
+	await frames(10)
+	check(b.weapon == EXCALIBUR, "Boss: un altro giocatore puo' raccogliere la spada")
+
+	# ---------- Livello 17: Il corvo gigante ----------
+	pl = await _open_arena("res://src/arenas/bosco/corvo_gigante.tscn")
+	a = pl[0]
+	b = pl[1]
+	boss = main.arena.get_node("GiantCrow")
+	stone2 = main.arena.get_node("SwordStone")
+	var thief: CrowThief = main.arena.get_node("Crows/Crow1")
+	thief._timer = 999.0
+	check(a.is_on_floor() and b.is_on_floor() and Arena.coop_now and main.arena.coop, "Boss: si parte in piedi, tutti alleati")
+	check(await _only_weapons(FOREST), "Boss: cadono coltelli, asce e balestre")
+	check(stone2.has_sword and a.weapon == null, "Boss: senza un vincitore del nido la spada e' piantata al centro")
+	check(is_equal_approx(boss.health, 1000.0) and boss.state == GiantCrow.State.FAR and not boss.vulnerable(), "Boss: il corvo ha 1000 di vita e parte lontano")
+	check(not boss.take_damage(50.0, a) and is_equal_approx(boss.health, 1000.0), "Boss: quando e' lontano non si puo' colpire")
+	# Tra giocatori non ci si fa danno.
+	a.global_position = Vector2(1000, 1298)
+	b.global_position = Vector2(1080, 1298)
+	a.facing = 1.0
+	await frames(5)
+	await tap("p0_attack")
+	await frames(8)
+	check(is_equal_approx(b.health, b.max_health), "Boss: i colpi tra giocatori non fanno danno")
+	# Il corvo arriva, avvisa col cerchio rosso e colpisce: 25 di danno a chi e' nel cerchio.
+	await _wait_for(func(): return boss.state == GiantCrow.State.WARN, 8.0)
+	check(boss.vulnerable() and boss.state == GiantCrow.State.WARN, "Boss: il corvo si avvicina e avvisa prima di colpire")
+	check(boss.strike_point.distance_to(Vector2(1040, 1298)) < 120.0, "Boss: il cerchio rosso e' sul bersaglio")
+	await _wait_for(func(): return boss.state == GiantCrow.State.RISE, 4.0)
+	print("    dopo la prima artigliata: vita A %.0f, vita B %.0f" % [a.health, b.health])
+	check(is_equal_approx(a.health, 75.0) and is_equal_approx(b.health, 75.0), "Boss: l'artigliata toglie 25 a chi e' nel cerchio")
+	check(absf(a.global_position.x - 1000.0) < 30.0, "Boss: l'artigliata non sposta chi colpisce")
+	# Seconda picchiata: spostandosi quando il cerchio e' bloccato la si schiva.
+	await _wait_for(func(): return boss.state == GiantCrow.State.WARN and boss._timer <= boss.lock_time, 4.0)
+	var away: float = 2400.0 if boss.strike_point.x < 1600.0 else 800.0
+	a.global_position = Vector2(away, 1298)
+	b.global_position = Vector2(away + 90.0, 1298)
+	await _wait_for(func(): return boss.state == GiantCrow.State.RISE, 4.0)
+	check(is_equal_approx(a.health, 75.0) and is_equal_approx(b.health, 75.0), "Boss: uscendo dal cerchio rosso si schiva l'artigliata")
+	# Dopo le picchiate resta basso, stanco: lo si colpisce da sotto mirando in alto.
+	await _wait_for(func(): return boss.state == GiantCrow.State.TIRED, 8.0)
+	check(boss.state == GiantCrow.State.TIRED and boss._swoops_done == boss.swoops, "Boss: dopo %d picchiate resta basso, stanco" % boss.swoops)
+	await frames(30)
+	b.global_position = Vector2(400, 1298)
+	a.equip(EXCALIBUR)
+	a.global_position = Vector2(boss.global_position.x, 1298)
+	a.velocity = Vector2.ZERO
+	await frames(3)
+	Input.action_press("p0_up")
+	await frames(2)
+	await tap("p0_attack")
+	Input.action_release("p0_up")
+	await frames(25)
+	print("    vita del corvo dopo un colpo di spada: %.0f" % boss.health)
+	check(is_equal_approx(boss.health, 900.0), "Boss: un colpo di spada toglie 100 (10 colpi per ucciderlo), la lama dello stesso colpo non conta")
+	check(main.damage_dealt[a.slot] >= 100.0, "Boss: i danni al corvo contano nelle statistiche")
+	# Poi se ne va e torna intoccabile.
+	await _wait_for(func(): return boss.state == GiantCrow.State.FAR, 6.0)
+	check(not boss.vulnerable() and absf(boss.size - boss.far_scale) < 0.01, "Boss: poi torna lontano e intoccabile")
+	# Il corvo ladro porta l'arma al corvo gigante, che la lascia dopo qualche colpo.
+	boss._timer = 999.0
+	a.drop_weapon()
+	a.equip(AXE)
+	thief._timer = 0.0
+	await _wait_for(func(): return boss.held_weapon != null, 10.0)
+	check(boss.held_weapon == AXE and a.weapon == null, "Boss: il corvo ladro porta l'arma rubata al corvo gigante")
+	thief._timer = 0.0
+	a.equip(KNIFE)
+	await frames(60)
+	check(a.weapon == KNIFE and thief.state != CrowThief.State.DIVE, "Boss: finche' il corvo gigante ha un'arma tra le zampe, il ladro non ruba")
+	thief._timer = 999.0
+	a.drop_weapon()
+	boss.set_physics_process(false)
+	boss.size = 1.0
+	boss.take_damage(10.0, a)
+	boss.take_damage(10.0, a)
+	check(boss.held_weapon == AXE, "Boss: due colpi non bastano a fargli lasciare l'arma")
+	boss.take_damage(10.0, a)
+	await frames(3)
+	var fallen: Array = get_nodes_in_group("pickups")
+	check(boss.held_weapon == null and fallen.size() == 1 and fallen[0].data == AXE, "Boss: al terzo colpo lascia cadere l'arma, che si puo' riprendere")
+	# Fine del livello: chi e' vivo quando il corvo muore prende una vittoria.
+	var wa: int = main.wins[a.slot]
+	var wb: int = main.wins[b.slot]
+	b._die("hp")
+	await frames(3)
+	check(not main.round_over, "Boss: se muore un giocatore solo, il round continua")
+	boss.health = 50.0
+	boss.take_damage(100.0, a)
+	await frames(3)
+	check(boss.state == GiantCrow.State.DEAD and main.round_over, "Boss: a zero vita il corvo muore e il round finisce")
+	check(main.wins[a.slot] == wa + 1 and main.wins[b.slot] == wb, "Boss: la vittoria va a chi e' ancora vivo, non a chi e' morto")
+	# Nuovo round: il corvo torna con tutta la vita. Se muoiono tutti, nessuno vince.
+	main.start_round()
+	await frames(5)
+	boss.set_physics_process(true)
+	check(is_equal_approx(boss.health, 1000.0) and boss.state == GiantCrow.State.FAR and boss.visible and a.alive and b.alive, "Boss: a ogni round il corvo riparte con tutta la vita")
+	wa = main.wins[a.slot]
+	wb = main.wins[b.slot]
+	a._die("fall")
+	b._die("hp")
+	await frames(3)
+	check(main.round_over and main.wins[a.slot] == wa and main.wins[b.slot] == wb, "Boss: se muoiono tutti nessuno prende la vittoria")
+	# Sopravvivono tutti: vittoria a tutti.
+	main.start_round()
+	await frames(5)
+	boss.set_physics_process(false)
+	boss.size = 1.0
+	boss.health = 10.0
+	boss.take_damage(10.0, b)
+	await frames(3)
+	check(main.wins[a.slot] == wa + 1 and main.wins[b.slot] == wb + 1, "Boss: se sopravvivono tutti, la vittoria va a tutti")
+	Arena.coop_now = false

@@ -23,6 +23,14 @@ extends Node2D
 ## sapere dove si è, ma rivela anche gli avversari). false = buio totale.
 @export var eyes_in_dark := false
 
+@export_group("Regole speciali")
+## true = livello "tutti insieme" (boss): i giocatori non si fanno danno tra loro,
+## e il round non finisce quando ne resta uno solo ma quando muoiono tutti
+## (o quando il boss viene sconfitto).
+@export var coop := false
+## true = chi ha vinto il livello prima con la spada di Re Artù in mano la tiene anche qui.
+@export var king_sword := false
+
 @export_group("Armi")
 ## false = in questa arena non cade nessuna arma dal cielo.
 @export var sky_weapons_enabled := true
@@ -35,6 +43,8 @@ extends Node2D
 static var night := false
 ## true se in questa arena buia si devono vedere gli occhi dei personaggi.
 static var night_eyes := false
+## true mentre si gioca un livello "tutti insieme": i colpi tra giocatori non fanno niente.
+static var coop_now := false
 
 
 ## Arena buia? (Luce d'ambiente molto scura.)

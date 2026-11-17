@@ -1,0 +1,91 @@
+[gd_scene load_steps=11 format=3]
+
+[ext_resource type="Script" path="res://src/arenas/arena.gd" id="arena"]
+[ext_resource type="Script" path="res://src/objects/platform.gd" id="platform"]
+[ext_resource type="Script" path="res://src/weapons/weapon_data.gd" id="wdata"]
+[ext_resource type="Resource" path="res://src/weapons/knife.tres" id="knife"]
+[ext_resource type="Resource" path="res://src/weapons/axe.tres" id="axe"]
+[ext_resource type="Resource" path="res://src/weapons/crossbow.tres" id="crossbow"]
+[ext_resource type="Script" path="res://src/objects/crow_thief.gd" id="crow"]
+[ext_resource type="Script" path="res://src/objects/sword_stone.gd" id="stone"]
+[ext_resource type="Resource" path="res://src/weapons/excalibur.tres" id="excalibur"]
+[ext_resource type="Script" path="res://src/objects/giant_crow.gd" id="boss"]
+
+[node name="CorvoGigante" type="Node2D"]
+script = ExtResource("arena")
+arena_name = "Il corvo gigante"
+bounds = Rect2(0, 0, 3200, 1800)
+coop = true
+king_sword = true
+sky_weapons = Dictionary[ExtResource("wdata"), float]({
+ExtResource("knife"): 2.0,
+ExtResource("axe"): 2.0,
+ExtResource("crossbow"): 1.5
+})
+
+[node name="Background" type="ColorRect" parent="."]
+offset_left = -1000.0
+offset_top = -1000.0
+offset_right = 4200.0
+offset_bottom = 2800.0
+mouse_filter = 2
+color = Color(0.5, 0.76, 0.95, 1)
+
+[node name="Decor" type="Node2D" parent="."]
+z_index = -5
+
+[node name="Sun" type="Polygon2D" parent="Decor"]
+color = Color(1.0, 0.93, 0.55, 1)
+polygon = PackedVector2Array(2770, 300, 2762, 353, 2738, 400, 2700, 438, 2653, 462, 2600, 470, 2547, 462, 2500, 438, 2462, 400, 2438, 353, 2430, 300, 2438, 247, 2462, 200, 2500, 162, 2547, 138, 2600, 130, 2653, 138, 2700, 162, 2738, 200, 2762, 247)
+
+[node name="HillsFar" type="Polygon2D" parent="Decor"]
+color = Color(0.56, 0.74, 0.62, 1)
+polygon = PackedVector2Array(-1000, 1500, -200, 1280, 500, 1460, 1300, 1250, 2100, 1440, 2900, 1290, 4200, 1500, 4200, 2800, -1000, 2800)
+
+[node name="Clouds" type="Polygon2D" parent="Decor"]
+color = Color(0.95, 0.97, 1.0, 1)
+polygon = PackedVector2Array(300, 520, 520, 430, 820, 470, 1000, 560, 760, 610, 420, 600)
+
+[node name="Platforms" type="Node2D" parent="."]
+
+
+[node name="Platform" type="StaticBody2D" parent="Platforms"]
+position = Vector2(300, 1300)
+script = ExtResource("platform")
+size = Vector2(2600, 70)
+color = Color(0.5, 0.36, 0.2, 1)
+
+[node name="GiantCrow" type="Node2D" parent="."]
+position = Vector2(1600, 330)
+script = ExtResource("boss")
+
+[node name="Crows" type="Node2D" parent="."]
+
+
+[node name="Crow1" type="Node2D" parent="Crows"]
+position = Vector2(2900, 160)
+script = ExtResource("crow")
+first_delay = 14.0
+interval = Vector2(16, 24)
+deliver_to = NodePath("../../GiantCrow")
+
+[node name="SwordStone" type="Node2D" parent="."]
+position = Vector2(1600, 1300)
+script = ExtResource("stone")
+weapon = ExtResource("excalibur")
+only_without_king = true
+
+[node name="Spawns" type="Node2D" parent="."]
+
+
+[node name="Spawn1" type="Marker2D" parent="Spawns"]
+position = Vector2(900, 1298)
+
+[node name="Spawn2" type="Marker2D" parent="Spawns"]
+position = Vector2(2300, 1298)
+
+[node name="Spawn3" type="Marker2D" parent="Spawns"]
+position = Vector2(1150, 1298)
+
+[node name="Spawn4" type="Marker2D" parent="Spawns"]
+position = Vector2(2050, 1298)

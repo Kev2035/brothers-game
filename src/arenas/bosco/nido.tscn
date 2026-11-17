@@ -1,0 +1,141 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://src/arenas/arena.gd" id="arena"]
+[ext_resource type="Script" path="res://src/objects/platform.gd" id="platform"]
+[ext_resource type="Script" path="res://src/objects/sword_stone.gd" id="stone"]
+[ext_resource type="Resource" path="res://src/weapons/excalibur.tres" id="excalibur"]
+
+[node name="Nido" type="Node2D"]
+script = ExtResource("arena")
+arena_name = "La chioma e il nido"
+bounds = Rect2(0, 0, 3200, 1800)
+sky_weapons_enabled = false
+
+[node name="Background" type="ColorRect" parent="."]
+offset_left = -1000.0
+offset_top = -1000.0
+offset_right = 4200.0
+offset_bottom = 2800.0
+mouse_filter = 2
+color = Color(0.5, 0.76, 0.95, 1)
+
+[node name="Decor" type="Node2D" parent="."]
+z_index = -5
+
+[node name="Sun" type="Polygon2D" parent="Decor"]
+color = Color(1.0, 0.93, 0.55, 1)
+polygon = PackedVector2Array(870, 330, 862, 383, 838, 430, 800, 468, 753, 492, 700, 500, 647, 492, 600, 468, 562, 430, 538, 383, 530, 330, 538, 277, 562, 230, 600, 192, 647, 168, 700, 160, 753, 168, 800, 192, 838, 230, 862, 277)
+
+[node name="HillsFar" type="Polygon2D" parent="Decor"]
+color = Color(0.56, 0.74, 0.62, 1)
+polygon = PackedVector2Array(-1000, 1400, -200, 1080, 500, 1260, 1300, 1000, 2100, 1240, 2900, 1040, 4200, 1300, 4200, 2800, -1000, 2800)
+
+[node name="HillsNear" type="Polygon2D" parent="Decor"]
+color = Color(0.42, 0.64, 0.42, 1)
+polygon = PackedVector2Array(-1000, 1500, 300, 1330, 1100, 1440, 1900, 1300, 2800, 1430, 4200, 1340, 4200, 2800, -1000, 2800)
+
+[node name="NestBranch" type="ColorRect" parent="Decor"]
+offset_left = 2640.0
+offset_top = 660.0
+offset_right = 2760.0
+offset_bottom = 2800.0
+mouse_filter = 2
+color = Color(0.36, 0.26, 0.18, 1)
+
+[node name="Leaves1" type="Polygon2D" parent="Decor"]
+color = Color(0.3, 0.55, 0.28, 1)
+polygon = PackedVector2Array(510, 1480, 497, 1560, 460, 1633, 403, 1690, 330, 1727, 250, 1740, 170, 1727, 97, 1690, 40, 1633, 3, 1560, -10, 1480, 3, 1400, 40, 1327, 97, 1270, 170, 1233, 250, 1220, 330, 1233, 403, 1270, 460, 1327, 497, 1400)
+
+[node name="Leaves2" type="Polygon2D" parent="Decor"]
+color = Color(0.3, 0.55, 0.28, 1)
+polygon = PackedVector2Array(1550, 1500, 1535, 1593, 1493, 1676, 1426, 1743, 1343, 1785, 1250, 1800, 1157, 1785, 1074, 1743, 1007, 1676, 965, 1593, 950, 1500, 965, 1407, 1007, 1324, 1074, 1257, 1157, 1215, 1250, 1200, 1343, 1215, 1426, 1257, 1493, 1324, 1535, 1407)
+
+[node name="Leaves3" type="Polygon2D" parent="Decor"]
+color = Color(0.3, 0.55, 0.28, 1)
+polygon = PackedVector2Array(2360, 1490, 2347, 1570, 2310, 1643, 2253, 1700, 2180, 1737, 2100, 1750, 2020, 1737, 1947, 1700, 1890, 1643, 1853, 1570, 1840, 1490, 1853, 1410, 1890, 1337, 1947, 1280, 2020, 1243, 2100, 1230, 2180, 1243, 2253, 1280, 2310, 1337, 2347, 1410)
+
+[node name="Leaves4" type="Polygon2D" parent="Decor"]
+color = Color(0.3, 0.55, 0.28, 1)
+polygon = PackedVector2Array(3330, 1470, 3316, 1557, 3277, 1635, 3215, 1697, 3137, 1736, 3050, 1750, 2963, 1736, 2885, 1697, 2823, 1635, 2784, 1557, 2770, 1470, 2784, 1383, 2823, 1305, 2885, 1243, 2963, 1204, 3050, 1190, 3137, 1204, 3215, 1243, 3277, 1305, 3316, 1383)
+
+[node name="Platforms" type="Node2D" parent="."]
+
+
+[node name="Ground" type="StaticBody2D" parent="Platforms"]
+position = Vector2(-250, 1560)
+script = ExtResource("platform")
+size = Vector2(3700, 600)
+color = Color(0.32, 0.5, 0.26, 1)
+
+[node name="Step1" type="StaticBody2D" parent="Platforms"]
+position = Vector2(700, 1340)
+script = ExtResource("platform")
+size = Vector2(380, 24)
+one_way = true
+color = Color(0.45, 0.62, 0.3, 1)
+
+[node name="Step2" type="StaticBody2D" parent="Platforms"]
+position = Vector2(1250, 1140)
+script = ExtResource("platform")
+size = Vector2(380, 24)
+one_way = true
+color = Color(0.45, 0.62, 0.3, 1)
+
+[node name="Step3" type="StaticBody2D" parent="Platforms"]
+position = Vector2(1800, 940)
+script = ExtResource("platform")
+size = Vector2(380, 24)
+one_way = true
+color = Color(0.45, 0.62, 0.3, 1)
+
+[node name="HighLeft" type="StaticBody2D" parent="Platforms"]
+position = Vector2(950, 820)
+script = ExtResource("platform")
+size = Vector2(380, 24)
+one_way = true
+color = Color(0.45, 0.62, 0.3, 1)
+
+[node name="Lookout" type="StaticBody2D" parent="Platforms"]
+position = Vector2(1500, 560)
+script = ExtResource("platform")
+size = Vector2(420, 24)
+one_way = true
+color = Color(0.45, 0.62, 0.3, 1)
+
+[node name="Nest" type="StaticBody2D" parent="Platforms"]
+position = Vector2(2300, 740)
+script = ExtResource("platform")
+size = Vector2(800, 60)
+color = Color(0.5, 0.36, 0.2, 1)
+
+[node name="NestRimLeft" type="StaticBody2D" parent="Platforms"]
+position = Vector2(2300, 690)
+script = ExtResource("platform")
+size = Vector2(40, 50)
+color = Color(0.5, 0.36, 0.2, 1)
+
+[node name="NestRimRight" type="StaticBody2D" parent="Platforms"]
+position = Vector2(3060, 690)
+script = ExtResource("platform")
+size = Vector2(40, 50)
+color = Color(0.5, 0.36, 0.2, 1)
+
+[node name="SwordStone" type="Node2D" parent="."]
+position = Vector2(2700, 740)
+script = ExtResource("stone")
+weapon = ExtResource("excalibur")
+
+[node name="Spawns" type="Node2D" parent="."]
+
+
+[node name="Spawn1" type="Marker2D" parent="Spawns"]
+position = Vector2(200, 1558)
+
+[node name="Spawn2" type="Marker2D" parent="Spawns"]
+position = Vector2(420, 1558)
+
+[node name="Spawn3" type="Marker2D" parent="Spawns"]
+position = Vector2(310, 1558)
+
+[node name="Spawn4" type="Marker2D" parent="Spawns"]
+position = Vector2(530, 1558)

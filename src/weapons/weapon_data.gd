@@ -28,6 +28,17 @@ enum Look { GUN, SWORD, KNIFE, AXE, SLING, CROSSBOW, LANTERN } ## disegno provvi
 ## Conta solo nelle arene buie. La lanterna è l'arma che fa luce.
 @export var light_radius := 0.0
 
+@export_group("Regole speciali")
+## false = quest'arma non si può lasciare col tasto (spada di Re Artù).
+@export var can_drop := true
+## true = se chi la porta muore, l'arma cade a terra e un altro può raccoglierla.
+@export var drop_on_death := false
+## Scudo speciale mentre si ha quest'arma in mano: apertura iniziale in gradi
+## (180 = scudo tutto intorno). 0 = lo scudo normale del personaggio.
+@export var shield_max_half_angle := 0.0
+@export var shield_full_time := 0.0 ## secondi in cui lo scudo speciale resta pieno...
+@export var shield_duration := 0.0 ## ...e secondi totali prima che sparisca (si restringe fino a 0)
+
 @export_group("Aspetto")
 @export var look := Look.GUN
 @export var length := 50.0 ## lunghezza del disegno (pixel)

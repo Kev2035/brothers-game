@@ -39,6 +39,11 @@ const ARENA_PATHS: Array[String] = [
 	"res://src/arenas/bosco/funghi.tscn",
 	"res://src/arenas/bosco/interruttori.tscn",
 	"res://src/arenas/bosco/lanterna.tscn",
+	"res://src/arenas/bosco/corvi.tscn",
+	"res://src/arenas/bosco/tempesta.tscn",
+	"res://src/arenas/bosco/alba.tscn",
+	"res://src/arenas/bosco/nido.tscn",
+	"res://src/arenas/bosco/corvo_gigante.tscn",
 	"res://src/arenas/test_arena/test_arena.tscn",
 	"res://src/arenas/torri/torri.tscn",
 	"res://src/arenas/ponti/ponti.tscn",
@@ -58,10 +63,13 @@ const TEST_WEAPONS: Array[WeaponData] = [
 	preload("res://src/weapons/axe.tres"),
 	preload("res://src/weapons/crossbow.tres"),
 	preload("res://src/weapons/lantern.tres"),
+	preload("res://src/weapons/excalibur.tres"),
 	preload("res://src/weapons/pistol.tres"),
 	preload("res://src/weapons/smg.tres"),
 	preload("res://src/weapons/shotgun.tres"),
 ]
+## La spada di Re Artù: chi vince un livello tenendola in mano se la porta nel livello del boss.
+const KING_SWORD: WeaponData = preload("res://src/weapons/excalibur.tres")
 const WEAPON_FIRST_DELAY := 2.0 ## secondi dall'inizio del round alla prima arma
 const WEAPON_INTERVAL := Vector2(4.0, 7.0) ## poi un'arma ogni 4-7 secondi
 const MAX_PICKUPS := 3 ## al massimo 3 armi a terra insieme
@@ -126,9 +134,12 @@ var camera: Camera2D
 var pause_menu: PauseMenu
 var ambient_light: CanvasModulate ## scurisce tutto il gioco nelle arene di notte (vedi Arena.ambient)
 var _light_tween: Tween
+## Il posto ("slot") di chi ha vinto l'ultimo livello con la spada di Re Artù in mano (-1 = nessuno).
+var king_slot := -1
 
 
 func _ready() -> void:
+	add_to_group("game_main") # così gli oggetti delle arene (temporale, boss) trovano il gestore partita
 	# Telecamera: inquadra tutta l'area dell'arena (più grande dello schermo),
 	# così i personaggi appaiono più piccoli e l'arena più ampia.
 	camera = Camera2D.new()
@@ -370,6 +381,7 @@ func new_match() -> void:
 		damage_dealt[i] = 0.0
 	total_arenas = 0
 	arenas_played = 0
+	king_slot = -1
 	scoreboard.visible = false
 	while transitioning: # se la telecamera sta scorrendo, si aspetta che arrivi
 		await get_tree().process_frame
@@ -388,6 +400,7 @@ func jump_to_arena(index: int) -> void:
 	_match_starting = false
 	phase = Phase.MATCH
 	arenas_played = 0
+	king_slot = -1
 	scoreboard.visible = false
 	if _next_path != "":
 		ResourceLoader.load_threaded_get(_next_path) # chiude il caricamento già iniziato
@@ -569,11 +582,20 @@ func start_round() -> void:
 		node.queue_free()
 	_spawn_timer = WEAPON_FIRST_DELAY
 	arena.place_fixed_weapons()
+	Arena.coop_now = arena.coop
+	# La spada di Re Artù: nel livello del boss la tiene chi l'ha vinta nel livello
+	# prima; se non ce l'ha nessuno (ordine a caso) è piantata nella roccia.
+	var king: Player = players[king_slot] if arena.king_sword and king_slot >= 0 else null
+	for stone in get_tree().get_nodes_in_group("sword_stones"):
+		if stone.only_without_king:
+			stone.available = king == null
 	# Gli oggetti che si muovono a tempo (piattaforme a perno...) ripartono da capo.
 	get_tree().call_group("round_reset", "reset_round")
 	var spawns := arena.spawn_points()
 	for p in participants():
 		p.respawn(spawns[p.slot])
+	if king != null:
+		king.equip(KING_SWORD)
 	_start_light()
 	_update_hud()
 
@@ -625,7 +647,7 @@ func spawn_weapon(data: WeaponData = null, x := NAN) -> WeaponPickup:
 
 
 ## F4 (per le prove): dà a tutti la stessa arma; a ogni pressione si passa alla successiva
-## (fionda -> spada di legno -> coltello -> ascia -> balestra -> pistola -> mitra -> pompa).
+## (fionda -> spada di legno -> coltello -> ascia -> balestra -> lanterna -> spada di Re Artù -> pistola -> mitra -> pompa).
 func give_weapon_to_all() -> void:
 	var data := TEST_WEAPONS[_give_index]
 	_give_index = (_give_index + 1) % TEST_WEAPONS.size()
@@ -668,21 +690,66 @@ func _on_player_died(p: Player, cause: String) -> void:
 	for q in everyone:
 		if q.alive:
 			alive.append(q)
-	if alive.size() > 1:
+	# Livello "tutti insieme" (boss): si va avanti finché c'è qualcuno vivo.
+	if alive.size() > (0 if arena.coop else 1):
 		return
 
 	round_over = true
-	if alive.size() == 1:
+	king_slot = -1
+	if arena.coop:
+		_show_banner("THE CROW WINS", Color.WHITE) # morti tutti: nessuno prende la vittoria
+	elif alive.size() == 1:
 		var winner := alive[0]
 		wins[winner.slot] += 1
+		if winner.weapon == KING_SWORD:
+			king_slot = winner.slot # si porta la spada nel livello del boss
 		_show_banner(WIN_PHRASES.pick_random(), winner.color)
 	else:
 		_show_banner("PAREGGIO!", Color.WHITE)
 	_update_hud()
+	_end_round_later()
+
+
+## Dopo la scritta di fine round si passa all'arena successiva.
+func _end_round_later() -> void:
 	var this_round := _round_id
 	await get_tree().create_timer(ROUND_END_DELAY, false).timeout
 	if round_over and this_round == _round_id:
 		_after_round()
+
+
+## Il boss è stato sconfitto (lo chiama il corvo gigante): ogni giocatore ancora
+## vivo prende una vittoria. Chi è morto non la prende, ma non perde niente.
+func coop_victory() -> void:
+	if round_over or transitioning or not arena.coop:
+		return
+	round_over = true
+	king_slot = -1
+	for p in participants():
+		if p.alive and counting_stats():
+			wins[p.slot] += 1
+	_show_banner("BOSS DOWN!", Color("f2c84b"))
+	_update_hud()
+	_end_round_later()
+
+
+## I danni fatti al boss contano nelle statistiche come gli altri.
+func boss_damaged(attacker: Player, amount: float) -> void:
+	if attacker != null and is_instance_valid(attacker) and counting_stats():
+		damage_dealt[attacker.slot] += amount
+
+
+## Lampo del temporale: la luce dell'arena sale di colpo a "color", resta così
+## per "hold" secondi e torna quella di prima in "fade" secondi.
+## Ritorna false (e non fa niente) durante il cambio di arena o lo sguardo iniziale.
+func flash_ambient(color: Color, hold: float, fade: float) -> bool:
+	if transitioning or (_light_tween != null and _light_tween.is_running()):
+		return false
+	ambient_light.color = color
+	_light_tween = create_tween()
+	_light_tween.tween_interval(hold)
+	_light_tween.tween_property(ambient_light, "color", arena.ambient, fade)
+	return true
 
 
 ## Sbuffo di fumo del colore del personaggio quando muore.
@@ -716,7 +783,7 @@ func _update_hud() -> void:
 		lines.append("PROVA ARENA: %s" % arena.arena_name)
 	else:
 		lines.append("PARTITA  -  arena %d di %d: %s" % [arenas_played + 1, arenas_per_lobby, arena.arena_name])
-	lines.append("PROTOTIPO 3a (Bosco)     Esc / Start = PAUSA     R / Select = nuovo round     F2 = manichino (premi ancora: cambia cosa fa)   F3 = togli manichino   F4 = arma a tutti (premi ancora: cambia arma)")
+	lines.append("PROTOTIPO 3 (Bosco)     Esc / Start = PAUSA     R / Select = nuovo round     F2 = manichino (premi ancora: cambia cosa fa)   F3 = togli manichino   F4 = arma a tutti (premi ancora: cambia arma)")
 	if _free_slot() >= 0:
 		lines.append("Per entrare: W o Spazio (tastiera + mouse)  -  Freccia SU (tastiera frecce)  -  A sul joystick")
 	lines.append("Tastiera + mouse: A/D muovi, W/Spazio salta, S giu, mira col mouse, pugno o SPARO clic sinistro (o F; FIONDA: tieni premuto e lascia), scudo clic destro (o E), lascia arma Q")

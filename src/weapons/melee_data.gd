@@ -19,8 +19,16 @@ func tick(p: Player, _delta: float, can_act: bool) -> void:
 		p.swing_t = 0.0
 		p.swing_dir = p.aim
 		p.night_flash(230.0, Color(0.9, 0.95, 1.0), 0.3)
-		if p.melee_hit(reach, cone_deg, damage):
+		var hit := p.melee_hit(reach, cone_deg, damage)
+		after_swing(p, hit)
+		if hit:
 			p.use_ammo() # conta solo se "ammo" è più di 0 (armi che si consumano)
+
+
+## Cosa succede subito dopo ogni fendente (hit = ha colpito qualcuno).
+## Le armi speciali lo riscrivono: la spada di Re Artù lancia una lama volante.
+func after_swing(_p: Player, _hit: bool) -> void:
+	pass
 
 
 func _swinging(p: Player) -> bool:

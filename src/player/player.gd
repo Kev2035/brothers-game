@@ -45,6 +45,10 @@ signal damaged(victim: Player, attacker: Player, amount: float)
 @export var slide_accel := 9000.0 ## quanto in fretta si prende velocità su una piattaforma obliqua
 @export var slide_control := 0.3 ## quanto conta la direzione premuta: 0.3 = in discesa +30%, in salita -30%
 
+@export_group("Piattaforme bagnate")
+@export var wet_accel := 1500.0 ## sul bagnato si parte piano...
+@export var wet_min_speed := 300.0 ## ...e una volta in movimento non si scende sotto questa velocità: si scivola fino al bordo
+
 @export_group("Scudo")
 @export var shield_duration := 0.45 ## secondi prima che l'arco sparisca del tutto
 @export var shield_max_half_angle := 90.0 ## apertura iniziale: 90 = semicerchio
@@ -114,6 +118,9 @@ var _eyes: Node2D
 var _held_light: PointLight2D ## luce dell'arma in mano, se ne fa (lanterna)
 var _slide_dir := Vector2.ZERO ## se sto su una piattaforma scivolosa: direzione "in discesa" (sennò zero)
 var _slide_speed := 0.0
+var _on_wet := false ## true se sto su una piattaforma bagnata (si scivola senza potersi fermare)
+var _last_ground := Vector2.ZERO ## ultimo punto in cui avevo i piedi per terra
+var last_melee_hits: Array = [] ## chi ha preso l'ultimo colpo ravvicinato (serve alle lame volanti)
 var _free_aim := false ## true se la mira arriva da mouse o levetta destra
 var _wall_lock := 0.0
 var _shield_t := -1.0 ## tempo da quando hai alzato lo scudo (-1 = niente scudo)
@@ -206,6 +213,7 @@ func _physics_process(delta: float) -> void:
 	if on_floor:
 		_coyote = coyote_time
 		_air_jumps = max_air_jumps
+		_last_ground = global_position
 	if not stunned and _just("jump"):
 		_buffer = jump_buffer
 
@@ -287,6 +295,14 @@ func _physics_process(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, target.x, slide_accel * delta)
 		if velocity.y >= 0.0: # se sto saltando, il salto non si tocca
 			velocity.y = absf(velocity.x) * _slide_dir.y / maxf(absf(_slide_dir.x), 0.01)
+	elif on_floor and _on_wet:
+		# Piattaforma bagnata: non si frena e non si torna indietro. Si può solo
+		# spingere nello stesso verso (o partire da fermi, piano). Per uscirne: saltare.
+		var moving := absf(velocity.x) > 30.0
+		if absf(input_x) > 0.01 and (not moving or signf(input_x) == signf(velocity.x)):
+			velocity.x = move_toward(velocity.x, input_x * run_speed, wet_accel * delta)
+		if moving:
+			velocity.x = signf(velocity.x) * maxf(absf(velocity.x), wet_min_speed)
 	else:
 		velocity.x = move_toward(velocity.x, input_x * run_speed, accel * delta)
 
@@ -308,7 +324,7 @@ func _physics_process(delta: float) -> void:
 		_shield_dir = aim
 
 	# Lasciare l'arma.
-	if weapon != null and _just("drop"):
+	if weapon != null and weapon.can_drop and _just("drop"):
 		throw_down_weapon()
 
 	# Attacco. O scudo o attacco: con lo scudo alzato non si colpisce.
@@ -388,7 +404,7 @@ func _tick_timers(delta: float) -> void:
 		last_attacker = null
 	if _shield_t >= 0.0:
 		_shield_t += delta
-		if _shield_t > shield_duration:
+		if _shield_t > _shield_time():
 			_shield_t = -1.0
 	_shield_flash = maxf(_shield_flash - delta, 0.0)
 	fire_cd -= delta
@@ -455,7 +471,18 @@ func is_shielding() -> bool:
 func shield_half_angle() -> float:
 	if not is_shielding():
 		return 0.0
+	if weapon != null and weapon.shield_max_half_angle > 0.0:
+		# Scudo speciale dell'arma: resta pieno per un po', poi si restringe fino a 0.
+		var k := clampf((_shield_t - weapon.shield_full_time) / maxf(_shield_time() - weapon.shield_full_time, 0.001), 0.0, 1.0)
+		return weapon.shield_max_half_angle * (1.0 - k)
 	return shield_max_half_angle * (1.0 - _shield_t / shield_duration)
+
+
+## Quanto dura lo scudo (alcune armi ne danno uno speciale, più lungo).
+func _shield_time() -> float:
+	if weapon != null and weapon.shield_max_half_angle > 0.0 and weapon.shield_duration > 0.0:
+		return weapon.shield_duration
+	return shield_duration
 
 
 func _read_floor() -> void:
@@ -464,6 +491,7 @@ func _read_floor() -> void:
 	# per questo la scivolata "si ricorda" finché si resta a terra e non si tocca un altro pavimento.
 	if not is_on_floor():
 		_slide_dir = Vector2.ZERO
+		_on_wet = false
 	for i in get_slide_collision_count():
 		var c := get_slide_collision(i)
 		var other := c.get_collider()
@@ -472,6 +500,7 @@ func _read_floor() -> void:
 			continue # non è un pavimento
 		if other is Node and (other as Node).is_in_group("one_way"):
 			_on_one_way = true
+		_on_wet = other is Node and (other as Node).is_in_group("wet")
 		if other is SlidePlatform and is_on_floor():
 			# La direzione "in discesa" lungo la piattaforma.
 			var along := Vector2(-n.y, n.x)
@@ -533,6 +562,7 @@ func night_flash(radius: float, flash_color: Color, time := 0.2) -> void:
 func melee_hit(reach: float, cone_deg: float, damage: float) -> bool:
 	var center := global_position + BODY
 	var hit_someone := false
+	last_melee_hits.clear()
 	for node in get_tree().get_nodes_in_group("players"):
 		var p := node as Player
 		if p == null or p == self or not p.alive:
@@ -543,6 +573,14 @@ func melee_hit(reach: float, cone_deg: float, damage: float) -> bool:
 		if in_reach and (in_cone or d.length() < BODY_RADIUS * 1.5):
 			if p.take_hit(aim, center, damage, self):
 				hit_someone = true
+				last_melee_hits.append(p)
+	# Bersagli dell'arena con una loro vita (il corvo gigante).
+	for node in get_tree().get_nodes_in_group("damageables"):
+		var bd: Vector2 = (node as Node2D).global_position - center
+		if bd.length() < reach + node.hit_radius and (absf(rad_to_deg(aim.angle_to(bd))) < cone_deg or bd.length() < node.hit_radius):
+			if node.take_damage(damage, self):
+				hit_someone = true
+				last_melee_hits.append(node)
 	# Oggetti dell'arena che si attivano con un colpo (interruttori...).
 	for node in get_tree().get_nodes_in_group("hittables"):
 		var d: Vector2 = (node as Node2D).global_position - center
@@ -563,9 +601,11 @@ func melee_hit(reach: float, cone_deg: float, damage: float) -> bool:
 func take_hit(direction: Vector2, from_pos: Vector2, damage := 0.0, attacker: Player = null) -> bool:
 	if not alive or riding:
 		return false # sullo scivolo a spirale non si può essere colpiti
+	if Arena.coop_now and attacker != null:
+		return false # livello del boss: tra giocatori non ci si fa niente
 	if is_shielding():
 		var incoming := from_pos - (global_position + BODY)
-		if absf(rad_to_deg(_shield_dir.angle_to(incoming))) <= shield_half_angle():
+		if absf(rad_to_deg(_shield_dir.angle_to(incoming))) <= shield_half_angle() + 0.01: # +0.01: lo scudo a 360 gradi copre anche il punto esattamente dietro
 			_shield_flash = 0.12
 			velocity += direction * block_pushback
 			return false
@@ -598,6 +638,16 @@ func _die(cause: String) -> void:
 	visible = false
 	set_solid(false)
 	set_physics_process(false)
+	if weapon != null and weapon.drop_on_death:
+		# L'arma resta a terra per gli altri. Se sono caduto nel vuoto, resta
+		# nell'ultimo punto in cui avevo i piedi per terra (sennò andrebbe persa).
+		var pickup := WeaponPickup.new()
+		pickup.data = weapon
+		pickup.ammo = ammo
+		pickup.death_y = death_y
+		pickup.position = (_last_ground if cause == "fall" else global_position) + BODY
+		get_parent().add_child.call_deferred(pickup)
+		drop_weapon()
 	died.emit(self, cause)
 
 
@@ -713,7 +763,9 @@ func respawn(at: Vector2) -> void:
 	if _held_light != null:
 		_held_light.visible = false
 	concealed = false
+	_on_wet = false
 	global_position = at
+	_last_ground = at
 	velocity = Vector2.ZERO
 	_hitstun_timer = 0.0
 	_drop_timer = 0.0

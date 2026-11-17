@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="ExcaliburData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/weapons/excalibur_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+display_name = "Spada di Re Artù"
+family = 0
+damage = 100.0
+fire_interval = 0.35
+ammo = 0
+can_drop = false
+drop_on_death = true
+shield_max_half_angle = 180.0
+shield_full_time = 0.6
+shield_duration = 1.2
+look = 1
+length = 150.0
+thickness = 16.0
+color = Color(0.95, 0.97, 1, 1)
+accent = Color(0.95, 0.78, 0.25, 1)
+reach = 190.0
+cone_deg = 55.0
+swing_time = 0.16
+swing_arc_deg = 130.0

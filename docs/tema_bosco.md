@@ -266,6 +266,57 @@ Nel resto del documento i numeri di questi ultimi cinque livelli sono ancora que
 
 Cose nuove nel motore, riutilizzabili: lanterne che si accendono a tempo (`start_off`, `turn_on`), oggetti che si attivano con un colpo (gruppo `hittables`, funzione `on_hit`), armi che fanno luce (`light_radius` nella scheda).
 
+### Livelli 13-17: scelte fatte costruendoli (2026-11-16)
+
+Costruiti tutti insieme su richiesta di Kevin. **Tutto da confermare provando.** (Numeri nuovi: vedi la tabella "Nuova numerazione".)
+
+**Livello 13 "I corvi ladri"** (`corvi.tscn`, `src/objects/crow_thief.gd`)
+- Notte **con la luna**: si vede tutto, non è un livello al buio (i tre prima lo erano già).
+- **Tre corvi** appollaiati su tre rami in alto. A turno (il primo dopo 4 s, poi ognuno ogni 7-11 s) scelgono un bersaglio a caso: un personaggio con un'arma in mano oppure un'arma a terra.
+- *(Aggiunta di Claude)* Prima di partire **avvisano per 0,8 secondi**: sbattono le ali e gli occhi rossi si ingrandiscono. Poi scendono in picchiata a 1500 px al secondo (i personaggi corrono a 700) e seguono il bersaglio: non si scappa.
+- Rubano l'arma e volano via in alto: l'arma è persa. Non fanno danno e non si possono colpire.
+- Unico "trucco": se lasci l'arma prima che arrivi, il corvo torna su a zampe vuote (ma tu sei disarmato lo stesso, e l'arma a terra può essere il prossimo bersaglio).
+- Dieci piattaforme, sotto c'è il vuoto. Cadono coltelli, asce e balestre.
+
+**Livello 14 "La tempesta"** (`tempesta.tscn`, `src/objects/storm.gd`)
+- **Buio pesto** come nei livelli 9-12, con lo sguardo iniziale di 3 secondi, e **pioggia** (si vede appena anche al buio).
+- **Lampi**: il primo dopo 6 secondi, poi uno ogni 5-9. La luce di tutta l'arena sale di colpo (attenuata: un azzurro-grigio, mai bianco pieno), resta un quarto di secondo e torna buio in un secondo. Insieme **trema lo schermo** (solo grafica). *(Scelta di Claude: nel documento il lampo "faceva vedere male"; in un'arena buia è più bello e più utile che faccia vedere tutto per un attimo.)*
+- **Quattro piattaforme bagnate** (con la striscia azzurra d'acqua): il ponte lungo in basso, quella al centro e le due in alto ai lati. Sopra **non si frena e non si torna indietro**: si scivola nella direzione in cui si andava, almeno a 300 px al secondo, fino a cadere dal bordo. Si può solo accelerare nello stesso verso o **saltare via**. Chi ci atterra da fermo resta fermo, e riparte piano.
+- Le piattaforme asciutte (partenze, due a metà ai lati, quella in cima) sono i posti sicuri.
+- **Niente corvi** (tolti il 2026-11-17 su richiesta di Kevin: buio + bagnato + corvi era troppo cattivo).
+
+**Livello 15 "L'alba"** (`alba.tscn`, `src/objects/flex_branch.gd`)
+- Cielo rosa con il sole che sorge, pioggia leggera, niente lampi, niente buio, niente corvi: livello di respiro.
+- **Sei rami flessibili** (verdi): finché qualcuno ci sta sopra scendono piano (230 px al secondo) fino a 200 px più giù; in due scendono fino a 340. Appena restano vuoti tornano su di scatto. Stare fermi su un ramo vuol dire perdere quota.
+- Due piattaforme **ancora bagnate** ai lati, due di partenza e una in cima, asciutte.
+
+**Livello 16 "La chioma e il nido"** (`nido.tscn`, `src/objects/sword_stone.gd`, `src/weapons/excalibur.tres`)
+- Sole, colline lontane. **Terreno pieno** da un bordo all'altro: non si cade. **Non cadono armi.**
+- Si parte tutti in basso a sinistra; il **nido** è in alto a destra, e ci si arriva per una scaletta di piattaforme. Al centro del nido c'è la roccia con la spada.
+- **Estrarre la spada**: a mani nude, vicino alla roccia, **tenere premuto l'attacco per 1 secondo** (un arco giallo si riempie). Se lasci il tasto, ti allontani o **vieni colpito**, si ricomincia da capo.
+- **Spada di Re Artù**: il colpo diretto uccide; ogni colpo lancia una **lama volante** (34 di danno, arriva a 1500 px); non si può lasciare; **scudo tutto intorno** che resta pieno 0,6 s e poi si restringe fino a sparire a 1,2 s (lo scudo normale dura 0,45 s e copre mezzo giro).
+- Chi ha la spada può comunque essere ucciso a pugni: in quel caso **la spada cade a terra** e la prende un altro.
+- Chi vince il round con la spada in mano **se la porta nel livello dopo**.
+
+**Livello 17 "Il corvo gigante"** (`corvo_gigante.tscn`, `src/objects/giant_crow.gd`)
+- Una sola piattaforma lunga; ai lati e sotto c'è il vuoto.
+- **Alleati**: i colpi tra giocatori non fanno niente.
+- Il corvo (1000 di vita) fa sempre lo stesso giro, che si impara:
+  1. **Lontano** (piccolo, sullo sfondo, sbiadito) per 4 secondi: non si può colpire e non colpisce.
+  2. **Arriva**: in poco più di un secondo diventa grande, sopra un giocatore a caso.
+  3. **Avviso** (0,9 s): a terra compare un **cerchio rosso** che segue il bersaglio; negli ultimi 0,4 s si blocca e si riempie.
+  4. **Picchiata** sul cerchio: chi è dentro prende 25 di danno (lo scudo la para). Poi risale.
+  5. Dopo **3 picchiate** resta **basso e stanco** per 2,2 secondi: è il momento per colpirlo (da sotto, mirando in alto).
+  6. **Se ne va** e il giro ricomincia.
+- Si può colpire ogni volta che è vicino (grande), con qualsiasi cosa: pugni, armi, frecce, lame volanti. Quando è colpito lampeggia di rosso e perde piume. **La sua vita non si mostra.**
+- Spada: 100 a colpo diretto (10 colpi), 34 la lama volante. La lama dello stesso fendente non si somma al colpo diretto.
+- **Un corvo ladro**, raro (il primo dopo 14 s, poi ogni 16-24): porta l'arma rubata (anche la spada) al corvo gigante, che la tiene nella zampa e la **lascia cadere dopo 3 colpi ricevuti**. Finché il corvo gigante ha un'arma, il ladro non ruba altro.
+- Se chi ha la spada muore, la spada resta sulla piattaforma (anche se è caduto nel vuoto: resta dove aveva i piedi l'ultima volta).
+- **Fine**: corvo morto → "BOSS DOWN!", una vittoria a ogni giocatore ancora vivo. Tutti morti → "THE CROW WINS", nessuna vittoria.
+- Senza un vincitore del nido (ordine a caso, o livello scelto dal menu) la spada è **nella roccia al centro** della piattaforma.
+
+Cose nuove nel motore, riutilizzabili: livelli "tutti insieme" (`coop` nell'arena), bersagli con una loro vita (gruppo `damageables`), regole speciali delle armi nella scheda (non si lascia, cade se muori, scudo speciale), piattaforme bagnate (`wet`), lampo su tutta l'arena.
+
 ### Quali armi cadono in quale livello *(proposta di Claude, da bilanciare)*
 
 Le armi dei primi livelli diventano **sempre più rare** salendo, e poi spariscono.

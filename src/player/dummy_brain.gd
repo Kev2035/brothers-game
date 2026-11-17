@@ -130,6 +130,8 @@ func _press(a: String) -> void:
 
 
 func _nearest_enemy(me: Player) -> Player:
+	if Arena.coop_now:
+		return null # nel livello del boss i giocatori sono alleati
 	var best: Player = null
 	var best_d := INF
 	for node in me.get_tree().get_nodes_in_group("players"):

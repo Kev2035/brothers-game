@@ -15,6 +15,8 @@ var max_distance := 2500.0
 var gravity := 0.0 ## caduta (pixel al secondo, ogni secondo); 0 = va dritto
 var radius := 0.0 ## 0 = scia luminosa; più di 0 = palla
 var color := Color("ffe08a")
+var blade := false ## true = si disegna come una mezzaluna (lama volante della spada di Re Artù)
+var ignore: Array = [] ## bersagli che questo colpo non tocca (già presi dal fendente che l'ha lanciato)
 var _travelled := 0.0
 
 
@@ -35,7 +37,7 @@ func _physics_process(delta: float) -> void:
 	var victim: Player = null
 	for node in get_tree().get_nodes_in_group("players"):
 		var p := node as Player
-		if p == null or p == shooter or not p.alive or p.riding:
+		if p == null or p == shooter or not p.alive or p.riding or ignore.has(p):
 			continue
 		var t := _segment_circle(from, to, p.global_position + Player.BODY, Player.BODY_RADIUS + 4.0)
 		if t >= 0.0 and t < best_t:
@@ -54,6 +56,16 @@ func _physics_process(delta: float) -> void:
 		var ht := _segment_circle(from, to, (node as Node2D).global_position, node.hit_radius)
 		if ht >= 0.0 and ht <= minf(best_t, wall_t):
 			node.on_hit(shooter)
+			queue_free()
+			return
+
+	# Bersagli dell'arena con una loro vita (il corvo gigante).
+	for node in get_tree().get_nodes_in_group("damageables"):
+		if ignore.has(node):
+			continue
+		var dt := _segment_circle(from, to, (node as Node2D).global_position, node.hit_radius)
+		if dt >= 0.0 and dt <= minf(best_t, wall_t) and node.take_damage(damage, shooter):
+			Fx.sparks(get_parent(), from.lerp(to, dt), Color(1, 0.3, 0.3), 8)
 			queue_free()
 			return
 
@@ -95,6 +107,13 @@ static func _segment_circle(a: Vector2, b: Vector2, c: Vector2, r: float) -> flo
 
 
 func _draw() -> void:
+	if blade:
+		# Mezzaluna luminosa, con la pancia verso dove sta andando.
+		var a := velocity.angle()
+		var back := -velocity.normalized() * 30.0
+		draw_arc(back, 46.0, a - 1.0, a + 1.0, 16, Color(color, 0.45), 16.0, true)
+		draw_arc(back, 46.0, a - 0.9, a + 0.9, 16, Color.WHITE, 6.0, true)
+		return
 	if radius > 0.0:
 		draw_circle(Vector2.ZERO, radius + 3.0, OUTLINE)
 		draw_circle(Vector2.ZERO, radius, color)
